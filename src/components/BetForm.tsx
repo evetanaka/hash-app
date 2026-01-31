@@ -16,7 +16,6 @@ export function BetForm({ mode, prediction, onBetPlaced }: BetFormProps) {
   const { address, isConnected } = useAccount()
   const { data: balance } = useBalance({
     address,
-    token: CONTRACTS.hashToken,
   })
 
   const [amount, setAmount] = useState('')

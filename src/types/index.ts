@@ -1,16 +1,18 @@
-export enum GameMode {
-  ONE_DIGIT = 0,
-  TWO_DIGIT = 1,
-  THREE_DIGIT = 2,
-}
+export const GameMode = {
+  ONE_DIGIT: 0,
+  TWO_DIGIT: 1,
+  THREE_DIGIT: 2,
+} as const
+export type GameMode = typeof GameMode[keyof typeof GameMode]
 
-export enum BetStatus {
-  PENDING = 0,
-  WON = 1,
-  LOST = 2,
-  EXPIRED = 3,
-  RIDING = 4,
-}
+export const BetStatus = {
+  PENDING: 0,
+  WON: 1,
+  LOST: 2,
+  EXPIRED: 3,
+  RIDING: 4,
+} as const
+export type BetStatus = typeof BetStatus[keyof typeof BetStatus]
 
 export interface Bet {
   id: bigint
