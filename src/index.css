@@ -12,6 +12,8 @@ body {
   font-family: 'JetBrains Mono', monospace;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: #0a0a0a;
+  color: #fff;
 }
 
 /* Custom scrollbar */
@@ -30,4 +32,376 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
+}
+
+/* ========== GAME COMPONENTS ========== */
+
+.game-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Mode Tabs */
+.mode-tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.mode-tab {
+  flex: 1;
+  padding: 1rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  color: #666;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.1s;
+}
+
+.mode-tab:hover {
+  color: #999;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.mode-tab.active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.mode-name {
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: 0.875rem;
+}
+
+.mode-payout {
+  font-size: 0.75rem;
+  color: #22c55e;
+}
+
+/* Picker Section */
+.picker-section {
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 1.5rem;
+  position: relative;
+}
+
+.picker-section h3 {
+  font-size: 0.75rem;
+  color: #888;
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* Digit Grid */
+.digit-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+}
+
+.digit-btn {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  background: #0a0a0a;
+  border: 1px solid #444;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.1s;
+  position: relative;
+}
+
+.digit-btn:hover {
+  border-color: #fff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
+}
+
+.digit-btn.selected {
+  background: #fff;
+  color: #0a0a0a;
+  border-color: #fff;
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+  transform: scale(1.05);
+}
+
+/* Digit Input (for 2-3 digits) */
+.digit-input {
+  display: flex;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.digit-input input {
+  flex: 1;
+  padding: 1rem;
+  font-size: 1.5rem;
+  font-family: inherit;
+  text-transform: uppercase;
+  text-align: center;
+  background: #0a0a0a;
+  border: 1px solid #fff;
+  color: #fff;
+  letter-spacing: 0.2em;
+}
+
+.digit-input input:focus {
+  outline: none;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+.random-btn {
+  padding: 1rem;
+  background: transparent;
+  border: 1px solid #666;
+  color: #888;
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.random-btn:hover {
+  border-color: #fff;
+  color: #fff;
+}
+
+/* Bet Form */
+.bet-form {
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.prediction-display {
+  font-size: 0.875rem;
+  color: #888;
+}
+
+.prediction-display .highlight {
+  font-weight: bold;
+  color: #fff;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.25rem 0.5rem;
+  margin-left: 0.5rem;
+}
+
+.amount-input {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.amount-input label {
+  font-size: 0.75rem;
+  color: #666;
+  text-transform: uppercase;
+}
+
+.amount-input input {
+  padding: 0.75rem 1rem;
+  font-family: inherit;
+  font-size: 1.25rem;
+  background: #0a0a0a;
+  border: 1px solid #fff;
+  color: #fff;
+}
+
+.amount-input input:focus {
+  outline: none;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+.quick-amounts {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.quick-amounts button {
+  flex: 1;
+  padding: 0.5rem;
+  background: transparent;
+  border: 1px solid #444;
+  color: #888;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.75rem;
+  transition: all 0.1s;
+}
+
+.quick-amounts button:hover {
+  border-color: #fff;
+  color: #fff;
+}
+
+.potential-win {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.win-amount {
+  font-weight: bold;
+  color: #22c55e;
+}
+
+.multiplier {
+  color: #666;
+}
+
+.place-bet-btn {
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  background: #fff;
+  color: #0a0a0a;
+  border: none;
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.place-bet-btn:hover:not(:disabled) {
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+}
+
+.place-bet-btn:disabled {
+  background: #333;
+  color: #666;
+  cursor: not-allowed;
+}
+
+.target-block {
+  font-size: 0.75rem;
+  color: #666;
+  text-align: center;
+}
+
+/* Pending Bet */
+.pending-bet {
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 2rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.pending-bet h2 {
+  font-size: 1.5rem;
+  letter-spacing: 0.1em;
+}
+
+.countdown {
+  font-size: 4rem;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.bet-id {
+  font-size: 0.75rem;
+  color: #666;
+}
+
+/* Bet Result */
+.bet-result {
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 2rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.bet-result.won {
+  border-color: #22c55e;
+  box-shadow: 0 0 30px rgba(34, 197, 94, 0.2);
+}
+
+.bet-result.lost {
+  border-color: #666;
+}
+
+.bet-result h2 {
+  font-size: 1.5rem;
+  letter-spacing: 0.1em;
+}
+
+.bet-result.won h2 {
+  color: #22c55e;
+}
+
+.block-hash {
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.block-hash code {
+  display: block;
+  margin-top: 0.25rem;
+  color: #888;
+  word-break: break-all;
+}
+
+.bet-result .actions {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+}
+
+.cash-out, .ride, .try-again {
+  flex: 1;
+  padding: 1rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.1s;
+  font-family: inherit;
+}
+
+.cash-out {
+  background: #22c55e;
+  color: #0a0a0a;
+  border: none;
+}
+
+.cash-out:hover {
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.5);
+}
+
+.ride {
+  background: transparent;
+  color: #fff;
+  border: 1px solid #fff;
+}
+
+.ride:hover {
+  background: #fff;
+  color: #0a0a0a;
+}
+
+.try-again {
+  background: #fff;
+  color: #0a0a0a;
+  border: none;
+}
+
+.try-again:hover {
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
 }
