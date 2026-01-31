@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAccount, useBalance } from 'wagmi'
 import { parseEther, formatEther } from 'viem'
 import { GameMode, GAME_MODE_CONFIG } from '../types'
-import { CONTRACTS } from '../config/wagmi'
+// import { CONTRACTS } from '../config/wagmi'  // TODO: Use when connecting to contracts
 
 interface BetFormProps {
   mode: GameMode
