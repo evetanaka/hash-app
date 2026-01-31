@@ -7,12 +7,14 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "serve dist -l 3000"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.20",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "serve": "^14.2.5",
     "viem": "^2.45.1",
     "wagmi": "^3.4.1"
   },
