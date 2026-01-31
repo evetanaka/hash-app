@@ -1,6 +1,6 @@
 import { http, createConfig } from 'wagmi'
 import { base, baseSepolia } from 'wagmi/chains'
-import { injected, walletConnect } from 'wagmi/connectors'
+import { injected } from 'wagmi/connectors'
 
 // Contract addresses (update after deployment)
 export const CONTRACTS = {
@@ -13,9 +13,6 @@ export const config = createConfig({
   chains: [base, baseSepolia],
   connectors: [
     injected(),
-    walletConnect({ 
-      projectId: import.meta.env.VITE_WC_PROJECT_ID || 'YOUR_PROJECT_ID' 
-    }),
   ],
   transports: {
     [base.id]: http(),
