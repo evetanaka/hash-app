@@ -1,0 +1,478 @@
+:root {
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #12121a;
+  --bg-card: #1a1a25;
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0b0;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --success: #22c55e;
+  --error: #ef4444;
+  --warning: #f59e0b;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.logo-icon {
+  font-size: 2rem;
+}
+
+.nav {
+  display: flex;
+  gap: 2rem;
+}
+
+.nav a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.nav a:hover, .nav a.active {
+  color: var(--text-primary);
+}
+
+/* Connect Wallet */
+.connect-wallet button,
+.wallet-connected button {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.connect-wallet button:hover,
+.wallet-connected button:hover {
+  background: var(--accent-hover);
+}
+
+.wallet-connected {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.address {
+  font-family: monospace;
+  background: var(--bg-card);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+}
+
+/* Main */
+.main {
+  flex: 1;
+  padding: 2rem;
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Jackpot Banner */
+.jackpot-banner {
+  background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
+  padding: 1rem 2rem;
+  border-radius: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.jackpot-amount {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.jackpot-hint {
+  font-size: 0.875rem;
+  opacity: 0.8;
+}
+
+/* Game Container */
+.game-container {
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 2rem;
+}
+
+/* Mode Tabs */
+.mode-tabs {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.mode-tab {
+  flex: 1;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border: 2px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mode-tab:hover {
+  border-color: var(--accent);
+}
+
+.mode-tab.active {
+  border-color: var(--accent);
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.mode-name {
+  font-weight: 600;
+}
+
+.mode-payout {
+  color: var(--success);
+  font-size: 1.25rem;
+  font-weight: bold;
+}
+
+/* Digit Grid */
+.digit-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+
+.digit-btn {
+  aspect-ratio: 1;
+  font-size: 1.5rem;
+  font-weight: bold;
+  font-family: monospace;
+  background: var(--bg-secondary);
+  border: 2px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text-primary);
+}
+
+.digit-btn:hover {
+  border-color: var(--accent);
+  transform: scale(1.05);
+}
+
+.digit-btn.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Digit Input (for 2-3 digits) */
+.digit-input {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.digit-input input {
+  flex: 1;
+  padding: 1rem;
+  font-size: 1.5rem;
+  font-family: monospace;
+  text-align: center;
+  background: var(--bg-secondary);
+  border: 2px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  color: var(--text-primary);
+}
+
+.digit-input input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.random-btn {
+  padding: 1rem 2rem;
+  background: var(--bg-secondary);
+  border: 2px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.random-btn:hover {
+  border-color: var(--accent);
+}
+
+/* Bet Form */
+.bet-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.prediction-display {
+  text-align: center;
+  font-size: 1.25rem;
+}
+
+.prediction-display .highlight {
+  font-family: monospace;
+  font-size: 2rem;
+  font-weight: bold;
+  color: var(--accent);
+}
+
+.amount-input label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--text-secondary);
+}
+
+.amount-input input {
+  width: 100%;
+  padding: 1rem;
+  font-size: 1.25rem;
+  background: var(--bg-secondary);
+  border: 2px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  color: var(--text-primary);
+}
+
+.amount-input input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.quick-amounts {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.quick-amounts button {
+  flex: 1;
+  padding: 0.5rem;
+  background: var(--bg-secondary);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.quick-amounts button:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.potential-win {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: rgba(34, 197, 94, 0.1);
+  border-radius: 12px;
+}
+
+.win-amount {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--success);
+}
+
+.multiplier {
+  color: var(--text-secondary);
+}
+
+.place-bet-btn {
+  padding: 1rem 2rem;
+  font-size: 1.25rem;
+  font-weight: bold;
+  background: var(--accent);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  color: white;
+  transition: all 0.2s;
+}
+
+.place-bet-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: scale(1.02);
+}
+
+.place-bet-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.target-block {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+/* Pending Bet */
+.pending-bet {
+  text-align: center;
+  padding: 3rem;
+}
+
+.countdown {
+  font-size: 5rem;
+  font-weight: bold;
+  color: var(--accent);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+/* Bet Result */
+.bet-result {
+  text-align: center;
+  padding: 3rem;
+}
+
+.bet-result.won h2 {
+  color: var(--success);
+  font-size: 2rem;
+}
+
+.bet-result.lost h2 {
+  color: var(--text-secondary);
+  font-size: 1.5rem;
+}
+
+.block-hash {
+  margin: 2rem 0;
+}
+
+.block-hash code {
+  display: block;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  word-break: break-all;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.cash-out, .ride, .try-again {
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cash-out {
+  background: var(--success);
+  color: white;
+}
+
+.ride {
+  background: var(--warning);
+  color: black;
+}
+
+.try-again {
+  background: var(--accent);
+  color: white;
+}
+
+/* Footer */
+.footer {
+  text-align: center;
+  padding: 2rem;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  color: var(--text-secondary);
+}
+
+.footer .links {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  margin-top: 1rem;
+}
+
+.footer a {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.footer a:hover {
+  color: var(--text-primary);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .header {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .nav {
+    gap: 1rem;
+  }
+  
+  .mode-tabs {
+    flex-direction: column;
+  }
+  
+  .jackpot-banner {
+    flex-direction: column;
+    text-align: center;
+  }
+}
