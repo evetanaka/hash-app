@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAccount, useBlockNumber, usePublicClient, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { useAccount, useBlockNumber, usePublicClient, useWriteContract, useWaitForTransactionReceipt, useWatchContractEvent } from 'wagmi'
 import { formatEther, parseAbiItem } from 'viem'
 import { CONTRACTS, TARGET_CHAIN } from '../config/wagmi'
 import { HashGameABI } from '../abi'
@@ -12,6 +12,16 @@ interface PendingBet {
   prediction: number
   targetBlock: bigint
   payout: bigint
+}
+
+interface ResolvedBet {
+  betId: bigint
+  won: boolean
+  result: number
+  payout: bigint
+  prediction: number
+  mode: number
+  amount: bigint
 }
 
 const MODE_LABELS: Record<number, string> = {
@@ -33,11 +43,50 @@ export function PendingBets() {
   const { data: blockNumber } = useBlockNumber({ watch: true, chainId: TARGET_CHAIN.id })
   const publicClient = usePublicClient({ chainId: TARGET_CHAIN.id })
   const [pendingBets, setPendingBets] = useState<PendingBet[]>([])
+  const [resolvedBets, setResolvedBets] = useState<ResolvedBet[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [resolvingBetId, setResolvingBetId] = useState<bigint | null>(null)
 
   // Resolve bet
   const { writeContract, data: resolveHash, isPending: isResolving } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isResolved } = useWaitForTransactionReceipt({ hash: resolveHash })
+  
+  // Watch for BetResolved events
+  useWatchContractEvent({
+    address: CONTRACTS.hashGame,
+    abi: HashGameABI,
+    eventName: 'BetResolved',
+    onLogs(logs) {
+      for (const log of logs) {
+        const args = (log as any).args
+        if (!args || args.player?.toLowerCase() !== address?.toLowerCase()) continue
+        
+        // Find the pending bet to get prediction and mode
+        const pendingBet = pendingBets.find(b => b.betId === args.betId)
+        if (pendingBet) {
+          const resolvedBetId = args.betId
+          // Add to resolved bets
+          setResolvedBets(prev => [...prev, {
+            betId: resolvedBetId,
+            won: args.won,
+            result: Number(args.result),
+            payout: args.payout,
+            prediction: pendingBet.prediction,
+            mode: pendingBet.mode,
+            amount: pendingBet.amount,
+          }])
+          // Remove from pending
+          setPendingBets(prev => prev.filter(b => b.betId !== resolvedBetId))
+          setResolvingBetId(null)
+          
+          // Auto-remove resolved bet after 5 seconds
+          setTimeout(() => {
+            setResolvedBets(prev => prev.filter(b => b.betId !== resolvedBetId))
+          }, 5000)
+        }
+      }
+    },
+  })
 
   // Fetch pending bets from BetPlaced events then check their status on-chain
   useEffect(() => {
@@ -118,6 +167,7 @@ export function PendingBets() {
 
   // Resolve a specific bet
   const handleResolve = (betId: bigint) => {
+    setResolvingBetId(betId)
     writeContract({
       address: CONTRACTS.hashGame,
       abi: HashGameABI,
@@ -142,7 +192,7 @@ export function PendingBets() {
     )
   }
 
-  if (pendingBets.length === 0) {
+  if (pendingBets.length === 0 && resolvedBets.length === 0) {
     return null
   }
 
@@ -150,14 +200,53 @@ export function PendingBets() {
 
   return (
     <div className="border border-cyan-500/30 bg-cyan-500/5 p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse" />
-        <h3 className="font-bold text-cyan-400 text-sm tracking-wider">
-          PENDING BETS ({pendingBets.length})
-        </h3>
-      </div>
+      {pendingBets.length > 0 && (
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse" />
+          <h3 className="font-bold text-cyan-400 text-sm tracking-wider">
+            PENDING BETS ({pendingBets.length})
+          </h3>
+        </div>
+      )}
 
       <div className="space-y-3">
+        {/* RESOLVED BETS (temporary display) */}
+        {resolvedBets.map((bet) => (
+          <div 
+            key={`resolved-${bet.betId.toString()}`} 
+            className={`border p-4 animate-pulse ${
+              bet.won 
+                ? 'border-green-500 bg-green-500/10' 
+                : 'border-red-500 bg-red-500/10'
+            }`}
+          >
+            <div className="flex justify-between items-center">
+              <div>
+                <div className={`text-2xl font-black ${bet.won ? 'text-green-400' : 'text-red-400'}`}>
+                  {bet.won ? '🎉 WIN!' : '💀 LOST'}
+                </div>
+                <div className="text-sm text-gray-400 mt-1">
+                  Bet #{bet.betId.toString()} • {MODE_LABELS[bet.mode]}
+                </div>
+              </div>
+              <div className="text-right">
+                {bet.won ? (
+                  <div className="text-xl font-bold text-green-400">
+                    +{Number(formatEther(bet.payout)).toLocaleString()} $HASH
+                  </div>
+                ) : (
+                  <div className="text-xl font-bold text-red-400">
+                    -{Number(formatEther(bet.amount)).toLocaleString()} $HASH
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="mt-2 flex justify-between text-xs text-gray-500">
+              <span>Your pick: <span className="text-white font-mono">{bet.prediction.toString(16).toUpperCase().padStart(MODE_DIGITS[bet.mode], '0')}</span></span>
+              <span>Result: <span className={bet.won ? 'text-green-400' : 'text-red-400'}>{bet.result.toString(16).toUpperCase().padStart(MODE_DIGITS[bet.mode], '0')}</span></span>
+            </div>
+          </div>
+        ))}
         {pendingBets.map((bet) => {
           const blocksRemaining = bet.targetBlock > currentBlock ? Number(bet.targetBlock - currentBlock) : 0
           const canResolve = currentBlock >= bet.targetBlock
@@ -243,7 +332,9 @@ export function PendingBets() {
                   disabled={isResolving || isConfirming}
                   className="w-full py-2 font-bold border border-green-500 text-green-400 hover:bg-green-500 hover:text-black transition-colors text-sm disabled:opacity-50"
                 >
-                  {isResolving || isConfirming ? '⏳ RESOLVING...' : '🎲 REVEAL RESULT'}
+                  {(isResolving || isConfirming) && resolvingBetId === bet.betId 
+                    ? '⏳ RESOLVING...' 
+                    : '🎲 REVEAL RESULT'}
                 </button>
               )}
             </div>
