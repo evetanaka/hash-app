@@ -96,7 +96,7 @@ interface TierDisplayProps {
   stakedAmount?: bigint
 }
 
-export function TierDisplay({ currentTier = 'bronze', stakedAmount }: TierDisplayProps) {
+export function TierDisplay({ currentTier = 'bronze', stakedAmount: _stakedAmount }: TierDisplayProps) {
   const [selectedTier, setSelectedTier] = useState(currentTier.toLowerCase())
   const [viewMode, setViewMode] = useState<'visual' | 'compare'>('visual')
 
