@@ -9,12 +9,16 @@ import { sepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 
 // Config
-const HASH_GAME = '0xf01F5453A08E6D961Bab8bf9f161c633Ba40F9fe';
+const HASH_GAME = '0x9C78665e908dA69C864110c78Babe135247cB390';
 const DEPLOYMENT_BLOCK = 10165750n;
 const RPC_URL = 'https://ethereum-sepolia-rpc.publicnode.com';
 
-// Keeper wallet - uses the deployer wallet
-const PRIVATE_KEY = process.env.KEEPER_PRIVATE_KEY || '0xeb0e321bbf4212b038f0554227c9987cb0b9022299479ec998f64d66d81be99b';
+// Keeper wallet - load from env (never hardcode!)
+const PRIVATE_KEY = process.env.KEEPER_PRIVATE_KEY;
+if (!PRIVATE_KEY) {
+  console.error('❌ KEEPER_PRIVATE_KEY not set. Create .env or export it.');
+  process.exit(1);
+}
 
 // ABI fragments
 const BET_PLACED_EVENT = parseAbiItem('event BetPlaced(uint256 indexed betId, address indexed player, uint8 mode, uint16 prediction, uint256 amount, uint256 targetBlock)');
