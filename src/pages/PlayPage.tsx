@@ -136,7 +136,6 @@ export function PlayPage() {
   const canBet = prediction !== null && 
     betAmountBigInt > 0n && 
     betAmountBigInt <= balance && 
-    !pendingBet &&
     !isPlacingBet &&
     !isBetConfirming
 
@@ -160,12 +159,11 @@ export function PlayPage() {
             <button 
               key={m}
               onClick={() => handleModeChange(m)}
-              disabled={!!pendingBet}
               className={`px-4 py-2 transition-colors ${
                 mode === m 
                   ? 'bg-white text-black font-bold border-t border-x border-white' 
                   : 'text-gray-500 hover:text-white border-t border-x border-transparent hover:border-white/20'
-              } ${pendingBet ? 'opacity-50 cursor-not-allowed' : ''}`}
+              }`}
             >
               {GAME_MODES[m].label}
               <span className="ml-2 text-xs opacity-60">x{payouts[m]}</span>
@@ -237,7 +235,7 @@ export function PlayPage() {
         </div>
 
         {/* BET INPUT & ACTION */}
-        {!pendingBet && isConnected && hasGameApproval && balance > 0n && (
+        {isConnected && hasGameApproval && balance > 0n && (
           <div className="flex flex-col gap-3">
             <div className="flex justify-between text-xs text-gray-400 uppercase">
               <span>Your Balance: <span className="text-white">{Number(formatEther(balance)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span> $HASH</span>

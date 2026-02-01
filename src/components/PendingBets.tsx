@@ -192,20 +192,27 @@ export function PendingBets() {
     )
   }
 
-  if (pendingBets.length === 0 && resolvedBets.length === 0) {
-    return null
-  }
+  // Always show the block, even when empty
 
   const currentBlock = blockNumber ?? 0n
 
+  const hasBets = pendingBets.length > 0 || resolvedBets.length > 0
+
   return (
     <div className="border border-cyan-500/30 bg-cyan-500/5 p-4">
-      {pendingBets.length > 0 && (
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse" />
-          <h3 className="font-bold text-cyan-400 text-sm tracking-wider">
-            PENDING BETS ({pendingBets.length})
-          </h3>
+      <div className="flex items-center gap-2 mb-3">
+        <div className={`w-2 h-2 rounded-full ${hasBets ? 'bg-cyan-400 animate-pulse' : 'bg-gray-600'}`} />
+        <h3 className="font-bold text-cyan-400 text-sm tracking-wider">
+          {pendingBets.length > 0 ? `PENDING BETS (${pendingBets.length})` : 'BETS'}
+        </h3>
+      </div>
+
+      {/* Empty state */}
+      {!hasBets && (
+        <div className="text-center py-4">
+          <div className="text-gray-600 text-2xl mb-2">📭</div>
+          <div className="text-gray-500 text-sm">No pending bets</div>
+          <div className="text-gray-600 text-xs mt-1">Place a bet to see it here</div>
         </div>
       )}
 
