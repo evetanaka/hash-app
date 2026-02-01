@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAccount } from 'wagmi'
 import { parseEther, formatEther } from 'viem'
 import { useHashGame, GameMode, BetStatus } from '../hooks/useHashGame'
 import { useHashToken } from '../hooks/useHashToken'
 import { useHashJackpot } from '../hooks/useHashJackpot'
+import { useHashStaking } from '../hooks/useHashStaking'
 import { TokenApproval } from '../components/TokenApproval'
 import { GetHashCTA } from '../components/GetHashCTA'
 import { PendingBets } from '../components/PendingBets'
@@ -37,6 +38,20 @@ export function PlayPage() {
     refetchStreak,
   } = useHashGame()
   const { currentPot } = useHashJackpot()
+  const { tierInfo, tierName } = useHashStaking()
+
+  // Min/Max bet calculation
+  const minBet = parseEther('10') // Minimum 10 $HASH
+  const maxBet = useMemo(() => {
+    if (!tierInfo || tierInfo.maxBetUsd === 0n) {
+      return parseEther('1000') // Default max for non-stakers
+    }
+    // Convert USD limit to tokens (assuming $0.10 per token = 1e7 in contract)
+    // maxBetUsd is in USD with 8 decimals, token has 18 decimals
+    // maxBetTokens = (maxBetUsd * 1e18) / tokenPriceUsd
+    // With price = 1e7 ($0.10): maxBetTokens = maxBetUsd * 1e11
+    return tierInfo.maxBetUsd * BigInt(1e11)
+  }, [tierInfo])
 
   const [mode, setMode] = useState<GameMode>(GameMode.ONE_DIGIT)
   const [selectedHex, setSelectedHex] = useState<string | null>(null)
@@ -133,9 +148,17 @@ export function PlayPage() {
 
   const prediction = getCurrentPrediction()
   const betAmountBigInt = parseEther(betAmount || '0')
+  
+  // Validation checks
+  const isBelowMin = betAmountBigInt < minBet
+  const isAboveMax = betAmountBigInt > maxBet
+  const isAboveBalance = betAmountBigInt > balance
+  
   const canBet = prediction !== null && 
     betAmountBigInt > 0n && 
-    betAmountBigInt <= balance && 
+    !isBelowMin &&
+    !isAboveMax &&
+    !isAboveBalance && 
     !isPlacingBet &&
     !isBetConfirming
 
@@ -241,6 +264,16 @@ export function PlayPage() {
               <span>Your Balance: <span className="text-white">{Number(formatEther(balance)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span> $HASH</span>
               <span>Win Chance: <span className="text-white">{modeConfig.chance}</span></span>
             </div>
+            
+            {/* Bet Limits Info */}
+            <div className="flex justify-between text-xs text-gray-500 border border-gray-800 px-3 py-2 bg-gray-900/50">
+              <span>MIN: <span className="text-yellow-400">{Number(formatEther(minBet)).toLocaleString()}</span></span>
+              <span className="text-gray-600">|</span>
+              <span>MAX: <span className="text-green-400">{Number(formatEther(maxBet)).toLocaleString()}</span></span>
+              <span className="text-gray-600">|</span>
+              <span>TIER: <span className="text-purple-400">{tierName || 'NONE'}</span></span>
+            </div>
+            
             <div className="flex gap-4">
               <div className="relative flex-grow">
                 <input 
@@ -248,7 +281,11 @@ export function PlayPage() {
                   value={betAmount}
                   onChange={(e) => setBetAmount(e.target.value)}
                   disabled={isProcessing}
-                  className="w-full bg-black border border-white py-3 pl-4 pr-20 font-mono text-lg focus:outline-none focus:ring-1 focus:ring-white"
+                  className={`w-full bg-black border py-3 pl-4 pr-20 font-mono text-lg focus:outline-none focus:ring-1 ${
+                    isBelowMin || isAboveMax || isAboveBalance 
+                      ? 'border-red-500 focus:ring-red-500' 
+                      : 'border-white focus:ring-white'
+                  }`}
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$HASH</span>
               </div>
@@ -266,6 +303,15 @@ export function PlayPage() {
                 {isPlacingBet ? 'CONFIRMING...' : isBetConfirming ? 'PROCESSING...' : 'PLACE BET'}
               </button>
             </div>
+            {/* Error Messages */}
+            {betAmountBigInt > 0n && (isBelowMin || isAboveMax || isAboveBalance) && (
+              <div className="text-xs text-red-400 mt-1">
+                {isBelowMin && `⚠ Minimum bet is ${Number(formatEther(minBet)).toLocaleString()} $HASH`}
+                {isAboveMax && `⚠ Maximum bet is ${Number(formatEther(maxBet)).toLocaleString()} $HASH (Stake more to increase)`}
+                {isAboveBalance && !isAboveMax && `⚠ Insufficient balance`}
+              </div>
+            )}
+            
             <div className="flex gap-2">
               {[10, 50, 100, 500].map(amt => (
                 <button
@@ -278,7 +324,11 @@ export function PlayPage() {
                 </button>
               ))}
               <button
-                onClick={() => setBetAmount(formatEther(balance))}
+                onClick={() => {
+                  // Set to max allowed (min of balance and maxBet)
+                  const effectiveMax = balance < maxBet ? balance : maxBet
+                  setBetAmount(formatEther(effectiveMax))
+                }}
                 disabled={isProcessing}
                 className="flex-1 py-1 text-xs border border-gray-700 text-gray-500 hover:border-white hover:text-white transition-colors"
               >
