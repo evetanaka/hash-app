@@ -97,11 +97,10 @@ interface TierDisplayProps {
 }
 
 export function TierDisplay({ currentTier = 'bronze', stakedAmount: _stakedAmount }: TierDisplayProps) {
-  // Normalize tier name to match our keys
   const normalizeTier = (tier: string) => {
     const lower = tier.toLowerCase()
     if (TIER_ORDER.includes(lower)) return lower
-    return 'bronze' // fallback
+    return 'bronze'
   }
 
   const [selectedTier, setSelectedTier] = useState(normalizeTier(currentTier))
@@ -109,55 +108,51 @@ export function TierDisplay({ currentTier = 'bronze', stakedAmount: _stakedAmoun
 
   const currentTierLower = normalizeTier(currentTier)
   const currentTierIndex = TIER_ORDER.indexOf(currentTierLower)
-  const progressPercent = ((currentTierIndex + 1) / TIER_ORDER.length) * 100
+  const progressPercent = ((currentTierIndex + 0.5) / TIER_ORDER.length) * 100
 
   const tierData = TIER_DATA[selectedTier] || TIER_DATA.bronze
 
   return (
     <div className="border border-white/30 mt-6">
       {/* Header */}
-      <div className="border-b border-white/20 p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xs text-gray-500 uppercase tracking-wider">// Staking Tiers</h2>
-          </div>
-          {/* Mobile toggle */}
-          <div className="flex md:hidden">
-            <button
-              onClick={() => setViewMode('visual')}
-              className={`px-3 py-1 text-xs uppercase tracking-wider border border-r-0 ${
-                viewMode === 'visual' 
-                  ? 'bg-white text-black border-white' 
-                  : 'border-gray-600 text-gray-500 hover:border-white hover:text-white'
-              }`}
-            >
-              Tiers
-            </button>
-            <button
-              onClick={() => setViewMode('compare')}
-              className={`px-3 py-1 text-xs uppercase tracking-wider border ${
-                viewMode === 'compare' 
-                  ? 'bg-white text-black border-white' 
-                  : 'border-gray-600 text-gray-500 hover:border-white hover:text-white'
-              }`}
-            >
-              Compare
-            </button>
-          </div>
+      <div className="border-b border-white/20 px-4 py-3 flex items-center justify-between">
+        <h2 className="text-xs text-gray-500 uppercase tracking-wider">// Staking Tiers</h2>
+        {/* Mobile toggle */}
+        <div className="flex md:hidden">
+          <button
+            onClick={() => setViewMode('visual')}
+            className={`px-3 py-1 text-xs uppercase tracking-wider border border-r-0 ${
+              viewMode === 'visual' 
+                ? 'bg-white text-black border-white' 
+                : 'border-gray-600 text-gray-500'
+            }`}
+          >
+            Tiers
+          </button>
+          <button
+            onClick={() => setViewMode('compare')}
+            className={`px-3 py-1 text-xs uppercase tracking-wider border ${
+              viewMode === 'compare' 
+                ? 'bg-white text-black border-white' 
+                : 'border-gray-600 text-gray-500'
+            }`}
+          >
+            Compare
+          </button>
         </div>
       </div>
 
       {/* Visual View */}
       <div className={`${viewMode === 'compare' ? 'hidden md:flex' : 'flex'} flex-col md:flex-row`}>
         {/* Tier Bar */}
-        <div className="flex-1 p-4">
-          <div className="relative py-6">
+        <div className="flex-1 p-4 flex items-center">
+          <div className="relative w-full">
             {/* Progress line background */}
-            <div className="absolute top-1/2 left-8 right-8 h-px bg-gray-700 -translate-y-1/2" />
+            <div className="absolute top-7 left-6 right-6 h-px bg-gray-800" />
             {/* Progress line filled */}
             <div 
-              className="absolute top-1/2 left-8 h-px bg-white -translate-y-1/2 transition-all duration-500"
-              style={{ width: `calc(${progressPercent}% - 64px)` }}
+              className="absolute top-7 left-6 h-px bg-white/50 transition-all duration-500"
+              style={{ width: `calc(${progressPercent}% - 24px)` }}
             />
             
             {/* Tier nodes */}
@@ -170,28 +165,28 @@ export function TierDisplay({ currentTier = 'bronze', stakedAmount: _stakedAmoun
                 return (
                   <div 
                     key={tier}
-                    className="flex flex-col items-center cursor-pointer group"
+                    className="flex flex-col items-center cursor-pointer group relative"
                     onClick={() => setSelectedTier(tier)}
                   >
                     <div 
-                      className={`w-12 h-12 md:w-14 md:h-14 border flex items-center justify-center bg-[#0a0a0a] transition-all ${
+                      className={`w-14 h-14 border flex items-center justify-center bg-[#0a0a0a] transition-all ${
                         isActive 
                           ? 'border-white bg-white shadow-[0_0_15px_rgba(255,255,255,0.5)]' 
-                          : 'border-gray-600 group-hover:border-white group-hover:shadow-[0_0_10px_rgba(255,255,255,0.3)]'
-                      } ${isCurrent ? 'border-2' : ''}`}
+                          : 'border-gray-700 group-hover:border-white'
+                      } ${isCurrent && !isActive ? 'border-white/50' : ''}`}
                     >
-                      <span className={`text-xl md:text-2xl ${isActive ? 'grayscale brightness-0' : ''}`}>
+                      <span className={`text-2xl ${isActive ? 'grayscale brightness-0' : ''}`}>
                         {data.emoji}
                       </span>
                     </div>
-                    <span className={`mt-2 text-[10px] md:text-xs uppercase tracking-wider transition-colors ${
-                      isActive || isCurrent ? 'text-white' : 'text-gray-600 group-hover:text-white'
+                    <span className={`mt-2 text-[11px] uppercase tracking-wider transition-colors ${
+                      isActive || isCurrent ? 'text-white font-bold' : 'text-gray-600 group-hover:text-white'
                     }`}>
                       {data.name}
                     </span>
                     <span className="text-[10px] text-gray-700">{data.minStake}</span>
                     {isCurrent && (
-                      <span className="text-[10px] text-green-500 mt-1 uppercase tracking-wider">► you</span>
+                      <span className="absolute -bottom-5 text-[10px] text-green-500 uppercase tracking-wider whitespace-nowrap">► you</span>
                     )}
                   </div>
                 )
@@ -201,19 +196,19 @@ export function TierDisplay({ currentTier = 'bronze', stakedAmount: _stakedAmoun
         </div>
 
         {/* Benefits Panel */}
-        <div className="w-full md:w-72 border-t md:border-t-0 md:border-l border-white/20">
-          <div className="p-4 border-b border-white/20 flex items-center gap-3">
-            <span className="text-2xl">{tierData.emoji}</span>
+        <div className="w-full md:w-64 border-t md:border-t-0 md:border-l border-white/20 flex flex-col">
+          <div className="px-4 py-3 border-b border-white/20 flex items-center gap-3">
+            <span className="text-xl">{tierData.emoji}</span>
             <div>
-              <h3 className="font-bold uppercase tracking-wider">{tierData.name}</h3>
-              <span className="text-xs text-gray-500">{tierData.range}</span>
+              <h3 className="font-bold uppercase tracking-wider text-sm">{tierData.name}</h3>
+              <span className="text-[10px] text-gray-500">{tierData.range}</span>
             </div>
           </div>
-          <div className="divide-y divide-white/10">
+          <div className="flex-1">
             {tierData.benefits.map((benefit, i) => (
-              <div key={i} className="flex justify-between items-center px-4 py-3 text-sm">
-                <span className="text-gray-500 text-xs uppercase tracking-wider">{benefit.name}</span>
-                <span className={`font-bold ${
+              <div key={i} className="flex justify-between items-center px-4 py-2 border-b border-white/5 last:border-b-0">
+                <span className="text-gray-500 text-[11px] uppercase tracking-wider">{benefit.name}</span>
+                <span className={`font-bold text-sm ${
                   benefit.highlight ? 'text-green-400' : 
                   benefit.check ? 'text-green-400' :
                   benefit.locked ? 'text-gray-700' : 'text-white'
