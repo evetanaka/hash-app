@@ -17,7 +17,7 @@ const TIER_COLORS: Record<string, string> = {
 
 export function StakePage() {
   const { isConnected } = useAccount()
-  const { balance, hasStakingApproval, refetchBalance } = useHashToken()
+  const { balance, refetchBalance } = useHashToken()
   const {
     stakeInfo,
     tierInfo,
@@ -152,9 +152,9 @@ export function StakePage() {
               )}
 
               {/* ADD MORE STAKE */}
-              {hasStakingApproval && (
-                <div className="pt-4 border-t border-white/20">
-                  <div className="text-xs text-gray-500 mb-2">ADD TO STAKE</div>
+              <div className="pt-4 border-t border-white/20">
+                <div className="text-xs text-gray-500 mb-2">ADD TO STAKE</div>
+                <TokenApproval target="staking" amount={stakeAmountBigInt}>
                   <div className="flex gap-2">
                     <input
                       type="number"
@@ -171,8 +171,8 @@ export function StakePage() {
                       {isAddingStake || isAddStakeConfirming ? '...' : 'ADD'}
                     </button>
                   </div>
-                </div>
-              )}
+                </TokenApproval>
+              </div>
 
               {/* UNSTAKE */}
               <div className="pt-4 border-t border-white/20 flex gap-2">
