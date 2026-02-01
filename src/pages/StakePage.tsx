@@ -87,7 +87,7 @@ export function StakePage() {
       <GetHashCTA />
 
       {/* GLOBAL STATS */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-3 gap-4">
         <div className="border border-white/20 p-4 text-center">
           <div className="text-xs text-gray-500 mb-1">TOTAL STAKED</div>
           <div className="text-xl font-bold">
@@ -110,7 +110,10 @@ export function StakePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* TIER DISPLAY */}
+      <TierDisplay currentTier={tierName} stakedAmount={stakeInfo?.amount} />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
         {/* YOUR STAKE */}
         <div className="border border-white p-6">
           <h2 className="text-lg font-bold mb-4 border-b border-white/20 pb-2">YOUR STAKE</h2>
@@ -297,9 +300,6 @@ export function StakePage() {
 
         </div>
       </div>
-
-      {/* TIER DISPLAY */}
-      <TierDisplay currentTier={tierName} stakedAmount={stakeInfo?.amount} />
     </main>
   )
 }
