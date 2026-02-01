@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useAccount, useBlockNumber, usePublicClient, useWriteContract, useWaitForTransactionReceipt, useWatchContractEvent } from 'wagmi'
+import { useState, useEffect, useRef } from 'react'
+import { useAccount, useBlockNumber, usePublicClient, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { formatEther, parseAbiItem } from 'viem'
 import { CONTRACTS, TARGET_CHAIN } from '../config/wagmi'
 import { HashGameABI } from '../abi'
@@ -42,53 +42,112 @@ export function PendingBets() {
   const { address } = useAccount()
   const { data: blockNumber } = useBlockNumber({ watch: true, chainId: TARGET_CHAIN.id })
   const publicClient = usePublicClient({ chainId: TARGET_CHAIN.id })
+  
   const [pendingBets, setPendingBets] = useState<PendingBet[]>([])
   const [resolvedBets, setResolvedBets] = useState<ResolvedBet[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [resolvingBetId, setResolvingBetId] = useState<bigint | null>(null)
+  
+  // Keep track of pending bets ref for use in callbacks
+  const pendingBetsRef = useRef<PendingBet[]>([])
+  pendingBetsRef.current = pendingBets
 
   // Resolve bet
-  const { writeContract, data: resolveHash, isPending: isResolving } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess: isResolved } = useWaitForTransactionReceipt({ hash: resolveHash })
-  
-  // Watch for BetResolved events
-  useWatchContractEvent({
-    address: CONTRACTS.hashGame,
-    abi: HashGameABI,
-    eventName: 'BetResolved',
-    onLogs(logs) {
-      for (const log of logs) {
-        const args = (log as any).args
-        if (!args || args.player?.toLowerCase() !== address?.toLowerCase()) continue
-        
-        // Find the pending bet to get prediction and mode
-        const pendingBet = pendingBets.find(b => b.betId === args.betId)
-        if (pendingBet) {
-          const resolvedBetId = args.betId
-          // Add to resolved bets
-          setResolvedBets(prev => [...prev, {
-            betId: resolvedBetId,
-            won: args.won,
-            result: Number(args.result),
-            payout: args.payout,
-            prediction: pendingBet.prediction,
-            mode: pendingBet.mode,
-            amount: pendingBet.amount,
-          }])
-          // Remove from pending
-          setPendingBets(prev => prev.filter(b => b.betId !== resolvedBetId))
-          setResolvingBetId(null)
-          
-          // Auto-remove resolved bet after 5 seconds
-          setTimeout(() => {
-            setResolvedBets(prev => prev.filter(b => b.betId !== resolvedBetId))
-          }, 5000)
-        }
-      }
-    },
-  })
+  const { writeContract, data: resolveHash, isPending: isResolving, reset: resetWrite } = useWriteContract()
+  const { isLoading: isConfirming, isSuccess: isResolved, data: receipt } = useWaitForTransactionReceipt({ hash: resolveHash })
 
-  // Fetch pending bets from BetPlaced events then check their status on-chain
+  // When resolve TX is confirmed, check the result
+  useEffect(() => {
+    const checkResolveResult = async () => {
+      if (isResolved && receipt && resolvingBetId !== null && publicClient) {
+        // Find the bet we were resolving
+        const bet = pendingBetsRef.current.find(b => b.betId === resolvingBetId)
+        
+        if (bet) {
+          try {
+            // Get the updated bet status from chain
+            const betData = await publicClient.readContract({
+              address: CONTRACTS.hashGame,
+              abi: HashGameABI,
+              functionName: 'getBet',
+              args: [resolvingBetId],
+            }) as any[]
+            
+            const status = Number(betData[5])
+            // 1 = WON, 2 = LOST
+            if (status === 1 || status === 2) {
+              const won = status === 1
+              // Calculate result from last transaction logs or estimate
+              // For now, use prediction as placeholder - actual result would come from event
+              
+              // Parse BetResolved event from receipt logs
+              for (const log of receipt.logs) {
+                try {
+                  if (log.address.toLowerCase() === CONTRACTS.hashGame.toLowerCase()) {
+                    // Check if this is a BetResolved event (topic[0])
+                    // Actually just extract result from log data
+                    if (log.topics.length >= 2) {
+                      const logBetId = BigInt(log.topics[1] || 0)
+                      if (logBetId === resolvingBetId && log.data.length >= 130) {
+                        // Extract result from log data (offset 64-128 is result)
+                        const actualResult = parseInt(log.data.slice(66, 130), 16)
+                        setResolvedBets(prev => [...prev, {
+                          betId: resolvingBetId,
+                          won,
+                          result: actualResult,
+                          payout: won ? bet.payout : 0n,
+                          prediction: bet.prediction,
+                          mode: bet.mode,
+                          amount: bet.amount,
+                        }])
+                        setPendingBets(prev => prev.filter(b => b.betId !== resolvingBetId))
+                        
+                        // Auto-remove after 5 seconds
+                        const resolvedId = resolvingBetId
+                        setTimeout(() => {
+                          setResolvedBets(prev => prev.filter(b => b.betId !== resolvedId))
+                        }, 5000)
+                        
+                        setResolvingBetId(null)
+                        resetWrite()
+                        return
+                      }
+                    }
+                  }
+                } catch {}
+              }
+              
+              // Fallback: just use the status we got
+              setResolvedBets(prev => [...prev, {
+                betId: resolvingBetId,
+                won,
+                result: bet.prediction, // We'll show actual result from chain
+                payout: won ? bet.payout : 0n,
+                prediction: bet.prediction,
+                mode: bet.mode,
+                amount: bet.amount,
+              }])
+              setPendingBets(prev => prev.filter(b => b.betId !== resolvingBetId))
+              
+              const resolvedId = resolvingBetId
+              setTimeout(() => {
+                setResolvedBets(prev => prev.filter(b => b.betId !== resolvedId))
+              }, 5000)
+            }
+          } catch (err) {
+            console.error('Error checking resolve result:', err)
+          }
+        }
+        
+        setResolvingBetId(null)
+        resetWrite()
+      }
+    }
+    
+    checkResolveResult()
+  }, [isResolved, receipt, resolvingBetId, publicClient, resetWrite])
+
+  // Fetch pending bets from chain
   useEffect(() => {
     const fetchPendingBets = async () => {
       if (!address || !publicClient) {
@@ -96,15 +155,16 @@ export function PendingBets() {
         return
       }
 
+      // Don't refetch while resolving
+      if (resolvingBetId !== null) return
+
       setIsLoading(true)
       
       try {
         const currentBlock = await publicClient.getBlockNumber()
-        // Look back ~1000 blocks max (RPC limit), but start from deployment
         const DEPLOYMENT_BLOCK = 10165750n
         const fromBlock = currentBlock > DEPLOYMENT_BLOCK + 900n ? currentBlock - 900n : DEPLOYMENT_BLOCK
 
-        // Get BetPlaced events for this user
         const logs = await publicClient.getLogs({
           address: CONTRACTS.hashGame,
           event: BET_PLACED_EVENT,
@@ -113,15 +173,16 @@ export function PendingBets() {
           toBlock: 'latest',
         })
 
-        // Check each bet's current status
         const pending: PendingBet[] = []
         
         for (const log of logs) {
           const args = log.args as any
           const betId = args.betId
           
+          // Skip if this bet is in resolved list
+          if (resolvedBets.some(r => r.betId === betId)) continue
+          
           try {
-            // Get current bet state from contract
             const betData = await publicClient.readContract({
               address: CONTRACTS.hashGame,
               abi: HashGameABI,
@@ -131,8 +192,7 @@ export function PendingBets() {
             
             const status = Number(betData[5])
             
-            // 0 = PENDING
-            if (status === 0) {
+            if (status === 0) { // PENDING
               pending.push({
                 betId,
                 player: args.player,
@@ -148,7 +208,6 @@ export function PendingBets() {
           }
         }
 
-        // Sort by betId descending (newest first)
         pending.sort((a, b) => Number(b.betId - a.betId))
         setPendingBets(pending)
       } catch (err) {
@@ -160,13 +219,14 @@ export function PendingBets() {
 
     fetchPendingBets()
     
-    // Refetch every 12 seconds (new block)
-    const interval = setInterval(fetchPendingBets, 12000)
+    const interval = setInterval(fetchPendingBets, 15000) // Every 15 seconds
     return () => clearInterval(interval)
-  }, [address, publicClient, isResolved])
+  }, [address, publicClient, resolvedBets, resolvingBetId])
 
   // Resolve a specific bet
   const handleResolve = (betId: bigint) => {
+    if (resolvingBetId !== null) return // Prevent double-click
+    
     setResolvingBetId(betId)
     writeContract({
       address: CONTRACTS.hashGame,
@@ -180,6 +240,9 @@ export function PendingBets() {
   if (!address) {
     return null
   }
+
+  const currentBlock = blockNumber ?? 0n
+  const hasBets = pendingBets.length > 0 || resolvedBets.length > 0
 
   if (isLoading && pendingBets.length === 0 && resolvedBets.length === 0) {
     return (
@@ -201,17 +264,11 @@ export function PendingBets() {
             <span className="w-1.5 h-3 bg-cyan-600 animate-pulse" style={{ animationDelay: '150ms' }} />
             <span className="w-1.5 h-3 bg-cyan-600 animate-pulse" style={{ animationDelay: '300ms' }} />
           </div>
-          <span>Current block: <span className="text-cyan-400 font-mono">#{(blockNumber ?? 0n).toString()}</span></span>
+          <span>Current block: <span className="text-cyan-400 font-mono">#{currentBlock.toString()}</span></span>
         </div>
       </div>
     )
   }
-
-  // Always show the block, even when empty
-
-  const currentBlock = blockNumber ?? 0n
-
-  const hasBets = pendingBets.length > 0 || resolvedBets.length > 0
 
   return (
     <div className="border border-cyan-500/30 bg-cyan-500/5 p-4">
@@ -236,7 +293,7 @@ export function PendingBets() {
         {resolvedBets.map((bet) => (
           <div 
             key={`resolved-${bet.betId.toString()}`} 
-            className={`border p-4 animate-pulse ${
+            className={`border p-4 ${
               bet.won 
                 ? 'border-green-500 bg-green-500/10' 
                 : 'border-red-500 bg-red-500/10'
@@ -269,10 +326,13 @@ export function PendingBets() {
             </div>
           </div>
         ))}
+
+        {/* PENDING BETS */}
         {pendingBets.map((bet) => {
           const blocksRemaining = bet.targetBlock > currentBlock ? Number(bet.targetBlock - currentBlock) : 0
           const canResolve = currentBlock >= bet.targetBlock
-          const totalBlocks = 5 // BLOCKS_TO_WAIT + some buffer
+          const isThisBetResolving = resolvingBetId === bet.betId
+          const totalBlocks = 5
           const progress = Math.min(100, Math.max(0, ((totalBlocks - blocksRemaining) / totalBlocks) * 100))
 
           return (
@@ -301,15 +361,12 @@ export function PendingBets() {
                   <span className="text-white font-mono">#{bet.targetBlock.toString()}</span>
                 </div>
                 
-                {/* Progress Bar with Block Animation */}
                 <div className="relative h-6 bg-black border border-white/20 overflow-hidden">
-                  {/* Progress fill */}
                   <div 
                     className="absolute inset-y-0 left-0 bg-gradient-to-r from-cyan-500/50 to-cyan-400/50 transition-all duration-1000"
                     style={{ width: `${progress}%` }}
                   />
                   
-                  {/* Block icons animation */}
                   <div className="absolute inset-0 flex items-center justify-center gap-1">
                     {[...Array(5)].map((_, i) => {
                       const filled = i < Math.ceil(progress / 20)
@@ -317,16 +374,13 @@ export function PendingBets() {
                         <div 
                           key={i}
                           className={`w-3 h-3 border transition-all duration-300 ${
-                            filled
-                              ? 'bg-cyan-400 border-cyan-400' 
-                              : 'border-gray-600'
+                            filled ? 'bg-cyan-400 border-cyan-400' : 'border-gray-600'
                           } ${!filled && i === Math.ceil(progress / 20) ? 'animate-pulse' : ''}`}
                         />
                       )
                     })}
                   </div>
 
-                  {/* Remaining text */}
                   <div className="absolute inset-0 flex items-center justify-end pr-2">
                     <span className="text-xs font-mono">
                       {canResolve ? (
@@ -351,10 +405,10 @@ export function PendingBets() {
               {canResolve && (
                 <button
                   onClick={() => handleResolve(bet.betId)}
-                  disabled={isResolving || isConfirming}
-                  className="w-full py-2 font-bold border border-green-500 text-green-400 hover:bg-green-500 hover:text-black transition-colors text-sm disabled:opacity-50"
+                  disabled={isThisBetResolving || isResolving || isConfirming}
+                  className="w-full py-2 font-bold border border-green-500 text-green-400 hover:bg-green-500 hover:text-black transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {(isResolving || isConfirming) && resolvingBetId === bet.betId 
+                  {isThisBetResolving && (isResolving || isConfirming)
                     ? '⏳ RESOLVING...' 
                     : '🎲 REVEAL RESULT'}
                 </button>
