@@ -5,14 +5,14 @@ import { useHashToken } from '../hooks/useHashToken'
 import { Zap, Volume2, VolumeX } from 'lucide-react'
 
 // Cyber-themed symbols (hex-inspired)
-const SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '🔔', '💎', '⭐', '7️⃣', '💀', '👑', '🚀', '⚡', '🎰', '💜', '🔮', '💀']
+const SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '🔔', '💎', '⭐', '7️⃣', '💀', '👑', '🚀', '⚡', '🎰', '💜', '🔮', '☠️']
 const SYMBOL_NAMES = ['CHERRY', 'LEMON', 'ORANGE', 'GRAPE', 'BELL', 'DIAMOND', 'STAR', 'SEVEN', 'SKULL', 'CROWN', 'ROCKET', 'BOLT', 'SLOT', 'NEON', 'CYBER', 'JACKPOT']
 
-// Payout info
+// Payout info - updated spec
 const PAYOUTS = {
-  threeJackpot: { mult: '100x', desc: '💀💀💀 JACKPOT' },
+  jackpot: { mult: 'JACKPOT', desc: '☠️☠️☠️ Jackpot Pool' },
   threeOfKind: { mult: '5x', desc: 'Three of a kind' },
-  sequential: { mult: '3x', desc: 'Sequential (e.g. 3-4-5)' },
+  sequential: { mult: '3x', desc: 'Sequential (e.g. 4-5-6)' },
   twoOfKind: { mult: '1.5x', desc: 'Two of a kind' },
 }
 
@@ -54,8 +54,8 @@ export function SlotsPage() {
     setIsSpinning(true)
     setLastWin(null)
     
-    // Simulate spin (will be replaced with contract call)
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    // Simulate waiting for next block (~12s on mainnet, faster on testnet)
+    await new Promise(resolve => setTimeout(resolve, 3000))
     
     // Generate random result
     const result = [
@@ -71,22 +71,27 @@ export function SlotsPage() {
     const win = calculateWin(result, Number(betAmount))
     if (win.amount > 0) {
       setLastWin({ amount: win.amount.toLocaleString(), type: win.type })
+      // Reset jackpot if won
+      if (win.type === 'JACKPOT') {
+        setJackpotPool(0)
+      }
     }
     
     // Add to history
     setSpinHistory(prev => [{ reels: result, win: win.amount, type: win.type }, ...prev].slice(0, 10))
     
-    // Update jackpot pool
-    setJackpotPool(prev => prev + Number(betAmount) * 0.02)
+    // Update jackpot pool (25% of bet goes to pool)
+    setJackpotPool(prev => prev + Number(betAmount) * 0.25)
     
     refetchBalance()
-  }, [betAmount, balance, isSpinning, refetchBalance])
+  }, [betAmount, balance, isSpinning, jackpotPool, refetchBalance])
   
   const calculateWin = (result: number[], bet: number): { amount: number; type: string } => {
     // Three of a kind
     if (result[0] === result[1] && result[1] === result[2]) {
       if (result[0] === 15) {
-        return { amount: bet * 100 + jackpotPool, type: 'JACKPOT' }
+        // Jackpot symbol - wins the entire jackpot pool (no multiplier)
+        return { amount: jackpotPool, type: 'JACKPOT' }
       }
       return { amount: bet * 5, type: 'THREE_OF_KIND' }
     }
@@ -129,21 +134,21 @@ export function SlotsPage() {
         <div className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 animate-pulse">
           {jackpotPool.toLocaleString(undefined, { maximumFractionDigits: 0 })} $HASH
         </div>
-        <div className="text-xs text-gray-500">Hit 💀💀💀 to win!</div>
+        <div className="text-xs text-gray-500">Hit ☠️☠️☠️ to win it all!</div>
       </div>
       
-      {/* Slot Machine */}
-      <div className="bg-black border-2 border-purple-500/50 p-6 mb-6 relative overflow-hidden">
+      {/* Slot Machine - Fixed width container */}
+      <div className="bg-black border-2 border-purple-500/50 p-6 mb-6 relative overflow-hidden w-full">
         {/* Neon glow effect */}
         <div className="absolute inset-0 bg-gradient-to-b from-purple-500/10 to-transparent pointer-events-none" />
         
-        {/* Reels */}
+        {/* Reels - Fixed size */}
         <div className="flex justify-center gap-4 mb-6">
           {displayReels.map((symbol, i) => (
             <div 
               key={i}
               className={`
-                w-24 h-24 md:w-32 md:h-32 
+                w-24 h-24 md:w-32 md:h-32 flex-shrink-0
                 bg-gray-900 border-2 border-purple-400/50 
                 flex items-center justify-center text-5xl md:text-6xl
                 transition-all duration-100
@@ -156,31 +161,39 @@ export function SlotsPage() {
           ))}
         </div>
         
-        {/* Symbol name display */}
+        {/* Symbol name display - Fixed width */}
         <div className="flex justify-center gap-4 mb-6">
           {displayReels.map((symbol, i) => (
-            <div key={i} className="w-24 md:w-32 text-center text-xs text-gray-500 font-mono">
+            <div key={i} className="w-24 md:w-32 flex-shrink-0 text-center text-xs text-gray-500 font-mono truncate">
               {SYMBOL_NAMES[symbol]}
             </div>
           ))}
         </div>
         
-        {/* Win display */}
-        {lastWin && lastWin.type !== 'NONE' && (
-          <div className="text-center mb-4 animate-bounce">
-            <div className="text-2xl font-bold text-green-400">
-              🎉 {lastWin.type === 'JACKPOT' ? 'JACKPOT!!!' : 'WINNER!'} 🎉
+        {/* Win display - Fixed height container */}
+        <div className="h-20 flex items-center justify-center mb-4">
+          {lastWin && lastWin.type !== 'NONE' ? (
+            <div className="text-center animate-bounce">
+              <div className="text-2xl font-bold text-green-400">
+                🎉 {lastWin.type === 'JACKPOT' ? 'JACKPOT!!!' : 'WINNER!'} 🎉
+              </div>
+              <div className="text-xl text-white">+{lastWin.amount} $HASH</div>
             </div>
-            <div className="text-xl text-white">+{lastWin.amount} $HASH</div>
-          </div>
-        )}
+          ) : isSpinning ? (
+            <div className="text-center">
+              <div className="text-xl text-purple-400 animate-pulse">
+                ⏳ Waiting for block...
+              </div>
+            </div>
+          ) : null}
+        </div>
         
         {/* Bet controls */}
         {isConnected && (
           <div className="space-y-4">
             <div className="flex justify-between text-xs text-gray-400">
               <span>Balance: <span className="text-white">{Number(formatEther(balance)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span> $HASH</span>
-              <span>Min: 10 | Max: 10,000</span>
+              <span>Min: 5 | Max: tier-based</span>
             </div>
             
             <div className="flex gap-4">
@@ -194,11 +207,12 @@ export function SlotsPage() {
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$HASH</span>
               </div>
+              {/* Fixed width button */}
               <button 
                 onClick={handleSpin}
                 disabled={isSpinning || parseEther(betAmount || '0') > balance}
                 className={`
-                  px-8 py-3 font-bold border-2 transition-all duration-100 uppercase tracking-wider
+                  w-36 py-3 font-bold border-2 transition-all duration-100 uppercase tracking-wider
                   ${isSpinning 
                     ? 'bg-purple-900 text-purple-400 border-purple-700 cursor-wait animate-pulse' 
                     : 'bg-purple-600 text-white border-purple-400 hover:bg-purple-500 hover:shadow-[0_0_20px_rgba(168,85,247,0.5)]'
@@ -211,7 +225,7 @@ export function SlotsPage() {
             
             {/* Quick bet buttons */}
             <div className="flex gap-2">
-              {[10, 50, 100, 500, 1000].map(amt => (
+              {[5, 25, 50, 100, 500].map(amt => (
                 <button
                   key={amt}
                   onClick={() => setBetAmount(amt.toString())}
@@ -231,8 +245,6 @@ export function SlotsPage() {
             </div>
           </div>
         )}
-        
-        {/* Token Approval will be added when contract is deployed */}
       </div>
       
       {/* Payout Table */}
@@ -243,7 +255,7 @@ export function SlotsPage() {
             {Object.entries(PAYOUTS).map(([key, { mult, desc }]) => (
               <div key={key} className="flex justify-between">
                 <span className="text-gray-400">{desc}</span>
-                <span className="text-green-400 font-bold">{mult}</span>
+                <span className={`font-bold ${key === 'jackpot' ? 'text-yellow-400' : 'text-green-400'}`}>{mult}</span>
               </div>
             ))}
           </div>
@@ -261,7 +273,7 @@ export function SlotsPage() {
                     {spin.reels.map(r => SYMBOLS[r]).join('')}
                   </span>
                   <span className={spin.win > 0 ? 'text-green-400' : 'text-red-400'}>
-                    {spin.win > 0 ? `+${spin.win}` : '-'}
+                    {spin.win > 0 ? `+${spin.win.toLocaleString()}` : '-'}
                   </span>
                 </div>
               ))
@@ -273,10 +285,10 @@ export function SlotsPage() {
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4 text-center text-sm">
         {[
-          { label: 'TOTAL SPINS', val: '12,403' },
-          { label: 'TOTAL WAGERED', val: '2.4M' },
-          { label: 'TOTAL PAID', val: '2.1M' },
-          { label: 'BURNED', val: '124K' },
+          { label: 'TOTAL SPINS', val: '—' },
+          { label: 'TOTAL WAGERED', val: '—' },
+          { label: 'TOTAL PAID', val: '—' },
+          { label: 'BURNED', val: '—' },
         ].map(stat => (
           <div key={stat.label} className="bg-black border border-gray-800 p-3">
             <div className="text-gray-500 text-xs">{stat.label}</div>
