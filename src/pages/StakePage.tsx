@@ -36,11 +36,13 @@ export function StakePage() {
     isStakeConfirmed,
     isAddingStake,
     isAddStakeConfirming,
+    isAddStakeConfirmed,
     isUnstaking,
     isUnstakeConfirming,
     isUnstakeConfirmed,
     isEmergencyUnstaking,
     isEmergencyUnstakeConfirming,
+    isEmergencyUnstakeConfirmed,
     isClaiming,
     isClaimConfirming,
     isClaimConfirmed,
@@ -49,14 +51,25 @@ export function StakePage() {
 
   const [stakeAmount, setStakeAmount] = useState('1000')
   const [showEmergency, setShowEmergency] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // Refetch on successful actions
+  // Refetch on successful actions with graceful delay
   useEffect(() => {
-    if (isStakeConfirmed || isUnstakeConfirmed || isClaimConfirmed) {
-      refetchAll()
-      refetchBalance()
+    const txConfirmed = isStakeConfirmed || isAddStakeConfirmed || isUnstakeConfirmed || isEmergencyUnstakeConfirmed || isClaimConfirmed
+    
+    if (txConfirmed && !isRefreshing) {
+      setIsRefreshing(true)
+      
+      // Small delay to ensure blockchain state is updated
+      const timer = setTimeout(() => {
+        refetchAll()
+        refetchBalance()
+        setIsRefreshing(false)
+      }, 1500)
+      
+      return () => clearTimeout(timer)
     }
-  }, [isStakeConfirmed, isUnstakeConfirmed, isClaimConfirmed])
+  }, [isStakeConfirmed, isAddStakeConfirmed, isUnstakeConfirmed, isEmergencyUnstakeConfirmed, isClaimConfirmed])
 
   const hasExistingStake = stakeInfo && stakeInfo.amount > 0n
   const stakeAmountBigInt = parseEther(stakeAmount || '0')
