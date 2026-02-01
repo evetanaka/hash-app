@@ -9,7 +9,7 @@ import { sepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 
 // Config
-const HASH_GAME = '0xc760963668563ee7a8542872ea4e2dda1a542332';
+const HASH_GAME = '0xDDCE0B582F2711a18A62Ce06569C5ea2d7375445';
 const DEPLOYMENT_BLOCK = 10165750n;
 const RPC_URL = 'https://ethereum-sepolia-rpc.publicnode.com';
 

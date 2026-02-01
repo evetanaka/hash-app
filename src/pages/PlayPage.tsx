@@ -40,17 +40,20 @@ export function PlayPage() {
   const { currentPot } = useHashJackpot()
   const { tierInfo, tierName } = useHashStaking()
 
+  // Tier max bets (matching contract tierMaxBet values)
+  const TIER_MAX_BETS: Record<number, bigint> = {
+    0: parseEther('100'),      // Base
+    1: parseEther('500'),      // Bronze
+    2: parseEther('2500'),     // Silver
+    3: parseEther('10000'),    // Gold
+    4: parseEther('50000'),    // Diamond
+  }
+  
   // Min/Max bet calculation
   const minBet = parseEther('10') // Minimum 10 $HASH
   const maxBet = useMemo(() => {
-    if (!tierInfo || tierInfo.maxBetUsd === 0n) {
-      return parseEther('1000') // Default max for non-stakers
-    }
-    // Convert USD limit to tokens (assuming $0.10 per token = 1e7 in contract)
-    // maxBetUsd is in USD with 8 decimals, token has 18 decimals
-    // maxBetTokens = (maxBetUsd * 1e18) / tokenPriceUsd
-    // With price = 1e7 ($0.10): maxBetTokens = maxBetUsd * 1e11
-    return tierInfo.maxBetUsd * BigInt(1e11)
+    const tier = tierInfo?.tier ?? 0
+    return TIER_MAX_BETS[tier] || parseEther('100')
   }, [tierInfo])
 
   const [mode, setMode] = useState<GameMode>(GameMode.ONE_DIGIT)
