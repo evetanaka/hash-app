@@ -52,12 +52,12 @@ export function Header() {
   return (
     <header className="flex flex-col md:flex-row justify-between items-start md:items-end border-b-2 border-white/20 pb-6">
       <Link to="/" className="whitespace-pre text-xs md:text-sm leading-none tracking-tighter opacity-90 select-none hover:opacity-100 transition-opacity">
-{`██╗  ██╗ █████╗ ███████╗██╗  ██╗
-██║  ██║██╔══██╗██╔════╝██║  ██║
-███████║███████║███████╗███████║
-██╔══██║██╔══██║╚════██║██╔══██║
-██║  ██║██║  ██║███████║██║  ██║
-╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝`}
+{`██████╗ ██╗      █████╗ ██╗   ██╗██╗  ██╗ █████╗ ███████╗██╗  ██╗
+██╔══██╗██║     ██╔══██╗╚██╗ ██╔╝██║  ██║██╔══██╗██╔════╝██║  ██║
+██████╔╝██║     ███████║ ╚████╔╝ ███████║███████║███████╗███████║
+██╔═══╝ ██║     ██╔══██║  ╚██╔╝  ██╔══██║██╔══██║╚════██║██╔══██║
+██║     ███████╗██║  ██║   ██║   ██║  ██║██║  ██║███████║██║  ██║
+╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝`}
       </Link>
       
       <div className="mt-4 md:mt-0 flex flex-col items-end gap-2 w-full md:w-auto">
