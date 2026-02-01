@@ -205,11 +205,10 @@ function GameContent() {
           
           <div className="mt-4 md:mt-0 flex flex-col items-end gap-2 w-full md:w-auto">
             <nav className="flex gap-4 text-sm">
-              {['PLAY', 'STAKE', 'REF', 'HISTORY'].map(item => (
-                <button key={item} className="hover:bg-white hover:text-black px-1 transition-colors duration-75 text-gray-400">
-                  [{item}]
-                </button>
-              ))}
+              <button className="bg-white text-black px-1 font-bold">[PLAY]</button>
+              <button className="text-gray-600 px-1 cursor-not-allowed" title="Coming soon">[STAKE] <span className="text-[10px]">soon</span></button>
+              <button className="text-gray-600 px-1 cursor-not-allowed" title="Coming soon">[REF] <span className="text-[10px]">soon</span></button>
+              <button className="text-gray-600 px-1 cursor-not-allowed" title="Coming soon">[HISTORY] <span className="text-[10px]">soon</span></button>
             </nav>
             <ConnectWallet />
           </div>
@@ -312,19 +311,19 @@ function GameContent() {
             {/* BET INPUT & ACTION */}
             <div className="flex flex-col gap-3">
               <div className="flex justify-between text-xs text-gray-400 uppercase">
-                <span>Balance: {balance.toLocaleString()} $HASH</span>
-                <span>Win Chance: {modeConfig.chance}</span>
+                <span>Your Balance: <span className="text-white">{balance.toLocaleString()}</span> $HASH</span>
+                <span>Win Chance: <span className="text-white">{modeConfig.chance}</span></span>
               </div>
               <div className="flex gap-4">
                 <div className="relative flex-grow">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
                   <input 
                     type="number" 
                     value={betAmount}
                     onChange={(e) => setBetAmount(e.target.value)}
                     disabled={gameState === 'MINING'}
-                    className="w-full bg-black border border-white py-3 pl-8 pr-4 font-mono text-lg focus:outline-none focus:ring-1 focus:ring-white"
+                    className="w-full bg-black border border-white py-3 pl-4 pr-20 font-mono text-lg focus:outline-none focus:ring-1 focus:ring-white"
                   />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$HASH</span>
                 </div>
                 <button 
                   onClick={placeBet}
@@ -407,7 +406,7 @@ function GameContent() {
                           WINNER
                         </div>
                         <div className="text-xl text-green-400">
-                          +{(parseInt(betAmount) || 0) * modeConfig.payout} $HASH
+                          +{((parseInt(betAmount) || 0) * modeConfig.payout).toLocaleString()} $HASH
                         </div>
                         <div className="mt-2 text-xs text-gray-400">BLOCK VALIDATED</div>
                       </div>
@@ -438,13 +437,13 @@ function GameContent() {
             {/* LIVE STATS */}
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="border border-white/20 p-2">
-                <div className="text-gray-500">PAYOUT</div>
+                <div className="text-gray-500">MULTIPLIER</div>
                 <div className="text-lg font-bold">x{modeConfig.payout}</div>
               </div>
               <div className="border border-white/20 p-2">
                 <div className="text-gray-500">POTENTIAL WIN</div>
                 <div className="text-lg font-bold text-green-400">
-                  {((parseInt(betAmount) || 0) * modeConfig.payout).toLocaleString()}
+                  {((parseInt(betAmount) || 0) * modeConfig.payout).toLocaleString()} <span className="text-xs font-normal text-gray-400">$HASH</span>
                 </div>
               </div>
             </div>
