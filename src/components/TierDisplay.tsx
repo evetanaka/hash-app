@@ -97,14 +97,21 @@ interface TierDisplayProps {
 }
 
 export function TierDisplay({ currentTier = 'bronze', stakedAmount: _stakedAmount }: TierDisplayProps) {
-  const [selectedTier, setSelectedTier] = useState(currentTier.toLowerCase())
+  // Normalize tier name to match our keys
+  const normalizeTier = (tier: string) => {
+    const lower = tier.toLowerCase()
+    if (TIER_ORDER.includes(lower)) return lower
+    return 'bronze' // fallback
+  }
+
+  const [selectedTier, setSelectedTier] = useState(normalizeTier(currentTier))
   const [viewMode, setViewMode] = useState<'visual' | 'compare'>('visual')
 
-  const currentTierLower = currentTier.toLowerCase()
+  const currentTierLower = normalizeTier(currentTier)
   const currentTierIndex = TIER_ORDER.indexOf(currentTierLower)
   const progressPercent = ((currentTierIndex + 1) / TIER_ORDER.length) * 100
 
-  const tierData = TIER_DATA[selectedTier]
+  const tierData = TIER_DATA[selectedTier] || TIER_DATA.bronze
 
   return (
     <div className="border border-white/30 mt-6">
