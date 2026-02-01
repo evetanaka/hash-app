@@ -25,7 +25,7 @@ export const config = createConfig({
   ],
   transports: {
     [mainnet.id]: http(),
-    [sepolia.id]: http(),
+    [sepolia.id]: http('https://ethereum-sepolia-rpc.publicnode.com'),
   },
   storage,
   syncConnectedChain: true,
