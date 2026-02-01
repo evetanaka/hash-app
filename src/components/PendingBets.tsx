@@ -181,12 +181,27 @@ export function PendingBets() {
     return null
   }
 
-  if (isLoading && pendingBets.length === 0) {
+  if (isLoading && pendingBets.length === 0 && resolvedBets.length === 0) {
     return (
       <div className="border border-cyan-500/30 bg-cyan-500/5 p-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 mb-3">
           <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse" />
-          <span className="text-sm text-gray-400">Loading pending bets...</span>
+          <h3 className="font-bold text-cyan-400 text-sm tracking-wider">BETS</h3>
+        </div>
+        
+        <div className="text-center py-4">
+          <div className="text-gray-600 text-2xl mb-2 animate-pulse">⏳</div>
+          <div className="text-gray-500 text-sm">Loading pending bets...</div>
+          <div className="text-gray-600 text-xs mt-1">Checking on-chain data</div>
+        </div>
+
+        <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
+          <div className="flex gap-0.5">
+            <span className="w-1.5 h-3 bg-cyan-600 animate-pulse" style={{ animationDelay: '0ms' }} />
+            <span className="w-1.5 h-3 bg-cyan-600 animate-pulse" style={{ animationDelay: '150ms' }} />
+            <span className="w-1.5 h-3 bg-cyan-600 animate-pulse" style={{ animationDelay: '300ms' }} />
+          </div>
+          <span>Current block: <span className="text-cyan-400 font-mono">#{(blockNumber ?? 0n).toString()}</span></span>
         </div>
       </div>
     )
