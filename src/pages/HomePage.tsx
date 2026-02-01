@@ -1,6 +1,9 @@
 import { Link } from 'react-router-dom'
 import { Terminal, Crosshair, Zap, Shield, Trophy, Users, Activity, Lock, DollarSign, Eye, Gift } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import { formatEther } from 'viem'
+import { useGlobalStats } from '../hooks/useGlobalStats'
+import { useHashJackpot } from '../hooks/useHashJackpot'
 
 interface GameStat {
   label: string
@@ -21,9 +24,15 @@ interface GameItem {
 }
 
 export function HomePage() {
-  // Live data simulation (will be replaced with real contract data)
+  // On-chain data for $HASH_ORIGINAL
+  const { totalBets, uniquePlayers, lastWinFormatted } = useGlobalStats()
+  const { currentPot } = useHashJackpot()
+  
+  // Format pool value
+  const poolFormatted = Number(formatEther(currentPot)).toLocaleString(undefined, { maximumFractionDigits: 0 })
+  
+  // Live data for other games (simulated - will be replaced when games are built)
   const [liveData, setLiveData] = useState({
-    hashPlayers: 842,
     slotsPool: 230400,
     sniperWin: 1500,
     auctionBid: 42050,
@@ -33,7 +42,6 @@ export function HomePage() {
   useEffect(() => {
     const interval = setInterval(() => {
       setLiveData(prev => ({
-        hashPlayers: Math.max(800, prev.hashPlayers + Math.floor(Math.random() * 5) - 2),
         slotsPool: prev.slotsPool + Math.floor(Math.random() * 100),
         sniperWin: Math.random() > 0.7 ? Math.floor(Math.random() * 5000) : prev.sniperWin,
         auctionBid: prev.auctionBid + Math.floor(Math.random() * 100),
@@ -53,9 +61,9 @@ export function HomePage() {
       accent: 'text-green-400',
       border: 'group-hover:border-green-400/50',
       stats: [
-        { label: 'POOL', val: '45,230', icon: Trophy },
-        { label: 'DEGENS', val: liveData.hashPlayers, icon: Users },
-        { label: 'LAST WIN', val: '250 $HASH', icon: Activity }
+        { label: 'POOL', val: `${poolFormatted}`, icon: Trophy },
+        { label: 'DEGENS', val: uniquePlayers > 0 ? uniquePlayers : Number(totalBets), icon: Users },
+        { label: 'LAST WIN', val: lastWinFormatted || '—', icon: Activity }
       ]
     },
     {
