@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface TierBenefit {
   name: string
@@ -105,6 +105,11 @@ export function TierDisplay({ currentTier = 'bronze', stakedAmount: _stakedAmoun
 
   const [selectedTier, setSelectedTier] = useState(normalizeTier(currentTier))
   const [viewMode, setViewMode] = useState<'visual' | 'compare'>('visual')
+
+  // Sync selectedTier with currentTier when it changes (e.g., after data loads)
+  useEffect(() => {
+    setSelectedTier(normalizeTier(currentTier))
+  }, [currentTier])
 
   const currentTierLower = normalizeTier(currentTier)
   const currentTierIndex = TIER_ORDER.indexOf(currentTierLower)
