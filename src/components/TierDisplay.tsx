@@ -24,11 +24,8 @@ const TIER_DATA: Record<string, TierData> = {
     range: '0 - 999 $HASH',
     benefits: [
       { name: 'Payout Boost', value: '+0%', highlight: true },
-      { name: 'Rakeback', value: '5%' },
-      { name: 'Daily Bonus', value: '—', locked: true },
       { name: 'Max Bet', value: '$100' },
       { name: 'Referral Rate', value: '5%' },
-      { name: 'VIP Support', value: '—', locked: true },
     ]
   },
   silver: {
@@ -38,11 +35,8 @@ const TIER_DATA: Record<string, TierData> = {
     range: '1,000 - 9,999 $HASH',
     benefits: [
       { name: 'Payout Boost', value: '+2.5%', highlight: true },
-      { name: 'Rakeback', value: '10%' },
-      { name: 'Daily Bonus', value: '0.05%' },
       { name: 'Max Bet', value: '$500' },
       { name: 'Referral Rate', value: '7.5%' },
-      { name: 'VIP Support', value: '—', locked: true },
     ]
   },
   gold: {
@@ -52,11 +46,8 @@ const TIER_DATA: Record<string, TierData> = {
     range: '10,000 - 49,999 $HASH',
     benefits: [
       { name: 'Payout Boost', value: '+5%', highlight: true },
-      { name: 'Rakeback', value: '15%' },
-      { name: 'Daily Bonus', value: '0.1%' },
       { name: 'Max Bet', value: '$2,500' },
       { name: 'Referral Rate', value: '10%' },
-      { name: 'VIP Support', value: '—', locked: true },
     ]
   },
   platinum: {
@@ -66,11 +57,8 @@ const TIER_DATA: Record<string, TierData> = {
     range: '50,000 - 99,999 $HASH',
     benefits: [
       { name: 'Payout Boost', value: '+7.5%', highlight: true },
-      { name: 'Rakeback', value: '20%' },
-      { name: 'Daily Bonus', value: '0.15%' },
       { name: 'Max Bet', value: '$10,000' },
       { name: 'Referral Rate', value: '12.5%' },
-      { name: 'VIP Support', value: '✓', check: true },
     ]
   },
   diamond: {
@@ -80,11 +68,8 @@ const TIER_DATA: Record<string, TierData> = {
     range: '100,000+ $HASH',
     benefits: [
       { name: 'Payout Boost', value: '+10%', highlight: true },
-      { name: 'Rakeback', value: '30%' },
-      { name: 'Daily Bonus', value: '0.25%' },
       { name: 'Max Bet', value: 'Unlimited' },
       { name: 'Referral Rate', value: '15%' },
-      { name: 'VIP Support', value: '✓', check: true },
     ]
   }
 }
@@ -260,7 +245,7 @@ export function TierDisplay({ currentTier = 'bronze', stakedAmount: _stakedAmoun
               ))}
             </tr>
             <tr>
-              <td className="p-2 text-gray-500">Rakeback</td>
+              <td className="p-2 text-gray-500">Max Bet</td>
               {TIER_ORDER.map(tier => (
                 <td key={tier} className={`p-2 text-center ${tier === currentTierLower ? 'bg-white/5' : ''}`}>
                   {TIER_DATA[tier].benefits[1].value}
@@ -268,34 +253,12 @@ export function TierDisplay({ currentTier = 'bronze', stakedAmount: _stakedAmoun
               ))}
             </tr>
             <tr>
-              <td className="p-2 text-gray-500">Daily</td>
-              {TIER_ORDER.map(tier => {
-                const val = TIER_DATA[tier].benefits[2]
-                return (
-                  <td key={tier} className={`p-2 text-center ${val.locked ? 'text-gray-700' : ''} ${tier === currentTierLower ? 'bg-white/5' : ''}`}>
-                    {val.value}
-                  </td>
-                )
-              })}
-            </tr>
-            <tr>
-              <td className="p-2 text-gray-500">Max Bet</td>
+              <td className="p-2 text-gray-500">Referral</td>
               {TIER_ORDER.map(tier => (
                 <td key={tier} className={`p-2 text-center ${tier === currentTierLower ? 'bg-white/5' : ''}`}>
-                  {TIER_DATA[tier].benefits[3].value}
+                  {TIER_DATA[tier].benefits[2].value}
                 </td>
               ))}
-            </tr>
-            <tr>
-              <td className="p-2 text-gray-500">VIP</td>
-              {TIER_ORDER.map(tier => {
-                const val = TIER_DATA[tier].benefits[5]
-                return (
-                  <td key={tier} className={`p-2 text-center ${val.check ? 'text-green-400' : 'text-gray-700'} ${tier === currentTierLower ? 'bg-white/5' : ''}`}>
-                    {val.value}
-                  </td>
-                )
-              })}
             </tr>
           </tbody>
         </table>
