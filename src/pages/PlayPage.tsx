@@ -154,9 +154,6 @@ export function PlayPage() {
         
         <GetHashCTA />
         
-        {/* PENDING BETS */}
-        <PendingBets />
-        
         {/* MODE TABS */}
         <div className="flex text-sm border-b border-white/20">
           {[GameMode.ONE_DIGIT, GameMode.TWO_DIGIT, GameMode.THREE_DIGIT].map((m) => (
@@ -382,6 +379,9 @@ export function PlayPage() {
             
           </div>
         </div>
+
+        {/* PENDING BETS */}
+        <PendingBets />
 
         {/* STREAK & JACKPOT */}
         <div className="border border-yellow-500/30 bg-yellow-500/5 p-3">
