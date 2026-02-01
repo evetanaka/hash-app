@@ -1,4 +1,4 @@
-import { http, createConfig, createStorage } from 'wagmi'
+import { http, createConfig, createStorage, cookieStorage } from 'wagmi'
 import { mainnet, sepolia } from 'wagmi/chains'
 import { injected } from 'wagmi/connectors'
 
@@ -13,17 +13,23 @@ export const CONTRACTS = {
 // Target chain for the app
 export const TARGET_CHAIN = sepolia
 
+// Safe storage that works in browser
+const storage = typeof window !== 'undefined' 
+  ? createStorage({ storage: window.localStorage, key: 'hash-app' })
+  : createStorage({ storage: cookieStorage })
+
 export const config = createConfig({
   chains: [mainnet, sepolia],
   connectors: [
-    injected(),
+    injected({ shimDisconnect: true }),
   ],
   transports: {
     [mainnet.id]: http(),
     [sepolia.id]: http(),
   },
-  storage: createStorage({ storage: window.localStorage }),
+  storage,
   syncConnectedChain: true,
+  multiInjectedProviderDiscovery: true,
 })
 
 declare module 'wagmi' {
