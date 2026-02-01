@@ -23,6 +23,15 @@ function ConnectWallet() {
   const { address, isConnected } = useAccount()
   const { connect, connectors } = useConnect()
   const { disconnect } = useDisconnect()
+  const [showModal, setShowModal] = useState(false)
+
+  const handleConnect = (_walletType: 'metamask' | 'keplr') => {
+    const connector = connectors.find(c => c.id === 'injected')
+    if (connector) {
+      connect({ connector })
+    }
+    setShowModal(false)
+  }
 
   if (isConnected) {
     return (
@@ -37,18 +46,70 @@ function ConnectWallet() {
   }
 
   return (
-    <div className="flex gap-2">
-      {connectors.slice(0, 1).map((connector) => (
-        <button
-          key={connector.uid}
-          onClick={() => connect({ connector })}
-          className="flex items-center gap-2 border border-white px-3 py-1 font-bold text-sm bg-black hover:bg-white hover:text-black transition-colors"
+    <>
+      <button
+        onClick={() => setShowModal(true)}
+        className="flex items-center gap-2 border border-white px-3 py-1 font-bold text-sm bg-black hover:bg-white hover:text-black transition-colors"
+      >
+        <Wallet size={14} />
+        <span>CONNECT</span>
+      </button>
+
+      {/* Wallet Selection Modal */}
+      {showModal && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 animate-fadeIn"
+          onClick={() => setShowModal(false)}
         >
-          <Wallet size={14} />
-          <span>CONNECT</span>
-        </button>
-      ))}
-    </div>
+          <div 
+            className="bg-[#0a0a0a] border border-white p-6 max-w-sm w-full mx-4 animate-slideUp"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-bold tracking-wider">CONNECT WALLET</h2>
+              <button 
+                onClick={() => setShowModal(false)}
+                className="text-gray-500 hover:text-white text-xl"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => handleConnect('metamask')}
+                className="flex items-center gap-4 p-4 border border-gray-700 hover:border-white hover:bg-white/5 transition-all group"
+              >
+                <div className="w-10 h-10 flex items-center justify-center bg-orange-500/20 rounded">
+                  <span className="text-2xl">🦊</span>
+                </div>
+                <div className="text-left">
+                  <div className="font-bold">MetaMask</div>
+                  <div className="text-xs text-gray-500">Connect with MetaMask</div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleConnect('keplr')}
+                className="flex items-center gap-4 p-4 border border-gray-700 hover:border-white hover:bg-white/5 transition-all group"
+              >
+                <div className="w-10 h-10 flex items-center justify-center bg-purple-500/20 rounded">
+                  <span className="text-2xl">⚛️</span>
+                </div>
+                <div className="text-left">
+                  <div className="font-bold">Keplr</div>
+                  <div className="text-xs text-gray-500">Connect with Keplr</div>
+                </div>
+              </button>
+            </div>
+
+            <p className="text-[10px] text-gray-600 mt-6 text-center">
+              By connecting, you agree to our Terms of Service
+            </p>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -473,6 +534,20 @@ function GameContent() {
         }
         .animate-marquee {
           animation: marquee 20s linear infinite;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.2s ease-out;
+        }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-slideUp {
+          animation: slideUp 0.3s ease-out;
         }
       `}</style>
     </div>
