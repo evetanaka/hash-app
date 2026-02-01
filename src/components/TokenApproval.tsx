@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { useHashToken } from '../hooks/useHashToken'
 import { formatEther } from 'viem'
 
@@ -19,19 +20,42 @@ export function TokenApproval({ target, amount, onApproved, children }: TokenApp
     isApproving,
     isApproveConfirming,
     isApproveConfirmed,
+    refetchGameAllowance,
+    refetchStakingAllowance,
   } = useHashToken()
 
   const hasApproval = target === 'game' ? hasGameApproval : hasStakingApproval
   const allowance = target === 'game' ? gameAllowance : stakingAllowance
   const approve = target === 'game' ? approveGame : approveStaking
+  const refetchAllowance = target === 'game' ? refetchGameAllowance : refetchStakingAllowance
+
+  // Track if we've already handled this confirmation
+  const hasHandledConfirmation = useRef(false)
 
   // Check if amount exceeds allowance
   const needsApproval = amount ? allowance < amount : !hasApproval
 
-  // If approved, call callback
-  if (isApproveConfirmed && onApproved) {
-    onApproved()
-  }
+  // Refetch allowance when approval is confirmed
+  useEffect(() => {
+    if (isApproveConfirmed && !hasHandledConfirmation.current) {
+      hasHandledConfirmation.current = true
+      // Refetch allowance after a short delay to ensure blockchain state is updated
+      const timeout = setTimeout(() => {
+        refetchAllowance()
+        if (onApproved) {
+          onApproved()
+        }
+      }, 1000)
+      return () => clearTimeout(timeout)
+    }
+  }, [isApproveConfirmed, refetchAllowance, onApproved])
+
+  // Reset the ref when starting a new approval
+  useEffect(() => {
+    if (isApproving) {
+      hasHandledConfirmation.current = false
+    }
+  }, [isApproving])
 
   // Has sufficient approval
   if (!needsApproval) {
