@@ -2,13 +2,15 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAccount } from 'wagmi'
 import { parseEther, formatEther } from 'viem'
 import { useHashToken } from '../hooks/useHashToken'
+import { useCyberSlots, SpinStatus, WinType } from '../hooks/useCyberSlots'
+import { useHashStaking } from '../hooks/useHashStaking'
 import { Zap, Volume2, VolumeX } from 'lucide-react'
 
 // Cyber-themed symbols (hex-inspired)
 const SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '🔔', '💎', '⭐', '7️⃣', '💀', '👑', '🚀', '⚡', '🎰', '💜', '🔮', '☠️']
 const SYMBOL_NAMES = ['CHERRY', 'LEMON', 'ORANGE', 'GRAPE', 'BELL', 'DIAMOND', 'STAR', 'SEVEN', 'SKULL', 'CROWN', 'ROCKET', 'BOLT', 'SLOT', 'NEON', 'CYBER', 'JACKPOT']
 
-// Payout info - updated spec
+// Payout info
 const PAYOUTS = {
   jackpot: { mult: 'JACKPOT', desc: '☠️☠️☠️ Jackpot Pool' },
   threeOfKind: { mult: '5x', desc: 'Three of a kind' },
@@ -16,23 +18,55 @@ const PAYOUTS = {
   twoOfKind: { mult: '1.5x', desc: 'Two of a kind' },
 }
 
+// Tier max bets
+const TIER_MAX_BETS: Record<number, bigint> = {
+  0: parseEther('100'),
+  1: parseEther('500'),
+  2: parseEther('2500'),
+  3: parseEther('10000'),
+  4: parseEther('50000'),
+}
+
 export function SlotsPage() {
-  const { isConnected } = useAccount()
-  const { balance, refetchBalance } = useHashToken()
+  const { isConnected, address } = useAccount()
+  const { balance, refetchBalance, slotsAllowance, hasSlotsApproval, approveSlots, isApproving, isApproveConfirming, refetchSlotsAllowance } = useHashToken()
+  const { tierInfo, tierName } = useHashStaking()
+  const {
+    jackpotPool,
+    pendingSpin,
+    pendingSpinId,
+    canResolve,
+    blockNumber,
+    gameStats,
+    spin,
+    resolve,
+    isSpinning,
+    isSpinConfirming,
+    isResolving,
+    isResolveConfirming,
+    refetchJackpot,
+    refetchStats,
+  } = useCyberSlots()
   
   const [betAmount, setBetAmount] = useState('100')
-  const [isSpinning, setIsSpinning] = useState(false)
   const [displayReels, setDisplayReels] = useState([0, 0, 0])
   const [lastWin, setLastWin] = useState<{ amount: string; type: string } | null>(null)
   const [soundEnabled, setSoundEnabled] = useState(true)
-  const [spinHistory, setSpinHistory] = useState<Array<{ reels: number[]; win: number; type: string }>>([])
+  const [spinHistory, setSpinHistory] = useState<Array<{ reels: number[]; win: bigint; type: number }>>([])
   
-  // Simulated jackpot pool (will be from contract)
-  const [jackpotPool, setJackpotPool] = useState(125000)
+  // Calculate limits
+  const minBet = parseEther('5')
+  const maxBet = TIER_MAX_BETS[tierInfo?.tier ?? 0] || parseEther('100')
   
-  // Animation effect for reels
+  // Check if approved for CyberSlots (need enough allowance)
+  const needsApproval = slotsAllowance < parseEther(betAmount || '0')
+  
+  // Is there a pending spin?
+  const hasPendingSpin = pendingSpinId && pendingSpinId > 0n && pendingSpin?.status === SpinStatus.PENDING
+  
+  // Animation effect for reels when waiting for block
   useEffect(() => {
-    if (isSpinning) {
+    if (hasPendingSpin && !canResolve) {
       const interval = setInterval(() => {
         setDisplayReels([
           Math.floor(Math.random() * 16),
@@ -40,75 +74,62 @@ export function SlotsPage() {
           Math.floor(Math.random() * 16),
         ])
       }, 50)
-      
       return () => clearInterval(interval)
     }
-  }, [isSpinning])
+  }, [hasPendingSpin, canResolve])
   
-  const handleSpin = useCallback(async () => {
-    if (isSpinning) return
+  // Auto-resolve when block is ready
+  useEffect(() => {
+    if (canResolve && pendingSpinId && !isResolving && !isResolveConfirming) {
+      resolve(pendingSpinId)
+    }
+  }, [canResolve, pendingSpinId, resolve, isResolving, isResolveConfirming])
+  
+  // Update display when spin resolved
+  useEffect(() => {
+    if (pendingSpin?.status === SpinStatus.RESOLVED && pendingSpin.result) {
+      setDisplayReels([...pendingSpin.result])
+      
+      if (pendingSpin.winType !== WinType.NONE) {
+        const winTypeNames = ['NONE', 'TWO_OF_KIND', 'SEQUENTIAL', 'THREE_OF_KIND', 'JACKPOT']
+        setLastWin({
+          amount: formatEther(pendingSpin.payout),
+          type: winTypeNames[pendingSpin.winType]
+        })
+        
+        // Add to history
+        setSpinHistory(prev => [{
+          reels: [...pendingSpin.result],
+          win: pendingSpin.payout,
+          type: pendingSpin.winType
+        }, ...prev].slice(0, 10))
+      } else {
+        setSpinHistory(prev => [{
+          reels: [...pendingSpin.result],
+          win: 0n,
+          type: WinType.NONE
+        }, ...prev].slice(0, 10))
+      }
+      
+      refetchBalance()
+      refetchJackpot()
+      refetchStats()
+    }
+  }, [pendingSpin?.status, pendingSpin?.result, pendingSpin?.winType, pendingSpin?.payout, refetchBalance, refetchJackpot, refetchStats])
+  
+  const handleSpin = useCallback(() => {
+    if (isSpinning || isSpinConfirming || hasPendingSpin) return
     
     const amount = parseEther(betAmount || '0')
-    if (amount <= 0n || amount > balance) return
+    if (amount < minBet || amount > maxBet || amount > balance) return
     
-    setIsSpinning(true)
     setLastWin(null)
-    
-    // Simulate waiting for next block (~12s on mainnet, faster on testnet)
-    await new Promise(resolve => setTimeout(resolve, 3000))
-    
-    // Generate random result
-    const result = [
-      Math.floor(Math.random() * 16),
-      Math.floor(Math.random() * 16),
-      Math.floor(Math.random() * 16),
-    ]
-    
-    setDisplayReels(result)
-    setIsSpinning(false)
-    
-    // Calculate win
-    const win = calculateWin(result, Number(betAmount))
-    if (win.amount > 0) {
-      setLastWin({ amount: win.amount.toLocaleString(), type: win.type })
-      // Reset jackpot if won
-      if (win.type === 'JACKPOT') {
-        setJackpotPool(0)
-      }
-    }
-    
-    // Add to history
-    setSpinHistory(prev => [{ reels: result, win: win.amount, type: win.type }, ...prev].slice(0, 10))
-    
-    // Update jackpot pool (25% of bet goes to pool)
-    setJackpotPool(prev => prev + Number(betAmount) * 0.25)
-    
-    refetchBalance()
-  }, [betAmount, balance, isSpinning, jackpotPool, refetchBalance])
+    spin(amount)
+  }, [betAmount, balance, minBet, maxBet, isSpinning, isSpinConfirming, hasPendingSpin, spin])
   
-  const calculateWin = (result: number[], bet: number): { amount: number; type: string } => {
-    // Three of a kind
-    if (result[0] === result[1] && result[1] === result[2]) {
-      if (result[0] === 15) {
-        // Jackpot symbol - wins the entire jackpot pool (no multiplier)
-        return { amount: jackpotPool, type: 'JACKPOT' }
-      }
-      return { amount: bet * 5, type: 'THREE_OF_KIND' }
-    }
-    
-    // Sequential
-    const sorted = [...result].sort((a, b) => a - b)
-    if (sorted[1] === sorted[0] + 1 && sorted[2] === sorted[1] + 1) {
-      return { amount: bet * 3, type: 'SEQUENTIAL' }
-    }
-    
-    // Two of a kind
-    if (result[0] === result[1] || result[1] === result[2] || result[0] === result[2]) {
-      return { amount: bet * 1.5, type: 'TWO_OF_KIND' }
-    }
-    
-    return { amount: 0, type: 'NONE' }
-  }
+  const isProcessing = isSpinning || isSpinConfirming || isResolving || isResolveConfirming || hasPendingSpin
+  const betAmountBigInt = parseEther(betAmount || '0')
+  const canSpin = betAmountBigInt >= minBet && betAmountBigInt <= maxBet && betAmountBigInt <= balance && !isProcessing && !needsApproval
 
   return (
     <main className="max-w-4xl mx-auto mt-4">
@@ -132,17 +153,16 @@ export function SlotsPage() {
       <div className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 border border-purple-500/50 p-4 mb-6 text-center">
         <div className="text-xs text-purple-300 uppercase tracking-wider">Progressive Jackpot</div>
         <div className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 animate-pulse">
-          {jackpotPool.toLocaleString(undefined, { maximumFractionDigits: 0 })} $HASH
+          {Number(formatEther(jackpotPool)).toLocaleString(undefined, { maximumFractionDigits: 0 })} $HASH
         </div>
         <div className="text-xs text-gray-500">Hit ☠️☠️☠️ to win it all!</div>
       </div>
       
-      {/* Slot Machine - Fixed width container */}
+      {/* Slot Machine */}
       <div className="bg-black border-2 border-purple-500/50 p-6 mb-6 relative overflow-hidden w-full">
-        {/* Neon glow effect */}
         <div className="absolute inset-0 bg-gradient-to-b from-purple-500/10 to-transparent pointer-events-none" />
         
-        {/* Reels - Fixed size */}
+        {/* Reels */}
         <div className="flex justify-center gap-4 mb-6">
           {displayReels.map((symbol, i) => (
             <div 
@@ -152,7 +172,7 @@ export function SlotsPage() {
                 bg-gray-900 border-2 border-purple-400/50 
                 flex items-center justify-center text-5xl md:text-6xl
                 transition-all duration-100
-                ${isSpinning ? 'animate-pulse border-purple-400' : ''}
+                ${hasPendingSpin && !canResolve ? 'animate-pulse border-purple-400' : ''}
                 ${lastWin && lastWin.type !== 'NONE' ? 'border-green-400 shadow-[0_0_20px_rgba(74,222,128,0.5)]' : ''}
               `}
             >
@@ -161,7 +181,7 @@ export function SlotsPage() {
           ))}
         </div>
         
-        {/* Symbol name display - Fixed width */}
+        {/* Symbol names */}
         <div className="flex justify-center gap-4 mb-6">
           {displayReels.map((symbol, i) => (
             <div key={i} className="w-24 md:w-32 flex-shrink-0 text-center text-xs text-gray-500 font-mono truncate">
@@ -170,20 +190,21 @@ export function SlotsPage() {
           ))}
         </div>
         
-        {/* Win display - Fixed height container */}
+        {/* Status display */}
         <div className="h-20 flex items-center justify-center mb-4">
           {lastWin && lastWin.type !== 'NONE' ? (
             <div className="text-center animate-bounce">
               <div className="text-2xl font-bold text-green-400">
                 🎉 {lastWin.type === 'JACKPOT' ? 'JACKPOT!!!' : 'WINNER!'} 🎉
               </div>
-              <div className="text-xl text-white">+{lastWin.amount} $HASH</div>
+              <div className="text-xl text-white">+{Number(lastWin.amount).toLocaleString()} $HASH</div>
             </div>
-          ) : isSpinning ? (
+          ) : hasPendingSpin ? (
             <div className="text-center">
               <div className="text-xl text-purple-400 animate-pulse">
-                ⏳ Waiting for block...
+                {canResolve ? '⏳ Resolving...' : `⏳ Block ${pendingSpin?.targetBlock?.toString()}...`}
               </div>
+              <div className="text-xs text-gray-500">Current: #{blockNumber.toString()}</div>
             </div>
           ) : null}
         </div>
@@ -193,8 +214,29 @@ export function SlotsPage() {
           <div className="space-y-4">
             <div className="flex justify-between text-xs text-gray-400">
               <span>Balance: <span className="text-white">{Number(formatEther(balance)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span> $HASH</span>
-              <span>Min: 5 | Max: tier-based</span>
+              <span>Tier: <span className="text-purple-400">{tierName || 'NONE'}</span></span>
             </div>
+            
+            {/* Bet Limits */}
+            <div className="flex justify-between text-xs text-gray-500 border border-gray-800 px-3 py-2 bg-gray-900/50">
+              <span>MIN: <span className="text-yellow-400">{Number(formatEther(minBet)).toLocaleString()}</span></span>
+              <span className="text-gray-600">|</span>
+              <span>MAX: <span className="text-green-400">{Number(formatEther(maxBet)).toLocaleString()}</span></span>
+            </div>
+            
+            {/* Approval check */}
+            {needsApproval && balance > 0n && (
+              <div className="border border-yellow-500/50 bg-yellow-500/10 p-3 text-center">
+                <div className="text-sm text-yellow-400 mb-2">Approve $HASH for CyberSlots</div>
+                <button 
+                  onClick={() => approveSlots()}
+                  disabled={isApproving || isApproveConfirming}
+                  className="px-4 py-2 bg-yellow-500 text-black font-bold hover:bg-yellow-400 disabled:opacity-50"
+                >
+                  {isApproving || isApproveConfirming ? 'APPROVING...' : 'APPROVE'}
+                </button>
+              </div>
+            )}
             
             <div className="flex gap-4">
               <div className="relative flex-grow">
@@ -202,24 +244,27 @@ export function SlotsPage() {
                   type="number" 
                   value={betAmount}
                   onChange={(e) => setBetAmount(e.target.value)}
-                  disabled={isSpinning}
-                  className="w-full bg-black border border-purple-500/50 py-3 pl-4 pr-20 font-mono text-lg focus:outline-none focus:border-purple-400"
+                  disabled={isProcessing}
+                  className={`w-full bg-black border py-3 pl-4 pr-20 font-mono text-lg focus:outline-none ${
+                    betAmountBigInt < minBet || betAmountBigInt > maxBet 
+                      ? 'border-red-500' 
+                      : 'border-purple-500/50 focus:border-purple-400'
+                  }`}
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$HASH</span>
               </div>
-              {/* Fixed width button */}
               <button 
                 onClick={handleSpin}
-                disabled={isSpinning || parseEther(betAmount || '0') > balance}
+                disabled={!canSpin}
                 className={`
                   w-36 py-3 font-bold border-2 transition-all duration-100 uppercase tracking-wider
-                  ${isSpinning 
-                    ? 'bg-purple-900 text-purple-400 border-purple-700 cursor-wait animate-pulse' 
+                  ${!canSpin
+                    ? 'bg-gray-900 text-gray-600 border-gray-800 cursor-not-allowed' 
                     : 'bg-purple-600 text-white border-purple-400 hover:bg-purple-500 hover:shadow-[0_0_20px_rgba(168,85,247,0.5)]'
                   }
                 `}
               >
-                {isSpinning ? 'SPINNING...' : 'SPIN'}
+                {isProcessing ? 'SPINNING...' : 'SPIN'}
               </button>
             </div>
             
@@ -229,15 +274,18 @@ export function SlotsPage() {
                 <button
                   key={amt}
                   onClick={() => setBetAmount(amt.toString())}
-                  disabled={isSpinning}
+                  disabled={isProcessing}
                   className="flex-1 py-1 text-xs border border-purple-700 text-purple-400 hover:border-purple-400 hover:text-white transition-colors"
                 >
                   {amt}
                 </button>
               ))}
               <button
-                onClick={() => setBetAmount(Math.min(Number(formatEther(balance)), 10000).toString())}
-                disabled={isSpinning}
+                onClick={() => {
+                  const max = balance < maxBet ? balance : maxBet
+                  setBetAmount(formatEther(max))
+                }}
+                disabled={isProcessing}
                 className="flex-1 py-1 text-xs border border-purple-700 text-purple-400 hover:border-purple-400 hover:text-white transition-colors"
               >
                 MAX
@@ -247,7 +295,7 @@ export function SlotsPage() {
         )}
       </div>
       
-      {/* Payout Table */}
+      {/* Payout Table & History */}
       <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="bg-black border border-purple-500/30 p-4">
           <h3 className="text-sm font-bold text-purple-400 mb-3 uppercase">Payout Table</h3>
@@ -272,8 +320,8 @@ export function SlotsPage() {
                   <span className="font-mono">
                     {spin.reels.map(r => SYMBOLS[r]).join('')}
                   </span>
-                  <span className={spin.win > 0 ? 'text-green-400' : 'text-red-400'}>
-                    {spin.win > 0 ? `+${spin.win.toLocaleString()}` : '-'}
+                  <span className={spin.win > 0n ? 'text-green-400' : 'text-red-400'}>
+                    {spin.win > 0n ? `+${Number(formatEther(spin.win)).toLocaleString()}` : '-'}
                   </span>
                 </div>
               ))
@@ -285,10 +333,10 @@ export function SlotsPage() {
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4 text-center text-sm">
         {[
-          { label: 'TOTAL SPINS', val: '—' },
-          { label: 'TOTAL WAGERED', val: '—' },
-          { label: 'TOTAL PAID', val: '—' },
-          { label: 'BURNED', val: '—' },
+          { label: 'TOTAL SPINS', val: gameStats ? gameStats.totalSpins.toString() : '—' },
+          { label: 'WAGERED', val: gameStats ? `${(Number(formatEther(gameStats.totalWagered)) / 1000).toFixed(0)}K` : '—' },
+          { label: 'PAID OUT', val: gameStats ? `${(Number(formatEther(gameStats.totalPaidOut)) / 1000).toFixed(0)}K` : '—' },
+          { label: 'BURNED', val: gameStats ? `${(Number(formatEther(gameStats.totalBurned)) / 1000).toFixed(0)}K` : '—' },
         ].map(stat => (
           <div key={stat.label} className="bg-black border border-gray-800 p-3">
             <div className="text-gray-500 text-xs">{stat.label}</div>

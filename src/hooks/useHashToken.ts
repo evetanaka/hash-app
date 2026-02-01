@@ -36,6 +36,16 @@ export function useHashToken() {
     query: { enabled: !!address }
   })
 
+  // Read allowance for CyberSlots
+  const { data: slotsAllowance, refetch: refetchSlotsAllowance } = useReadContract({
+    address: CONTRACTS.hashToken,
+    abi: HashTokenABI,
+    functionName: 'allowance',
+    args: address ? [address, CONTRACTS.cyberSlots] : undefined,
+    chainId: TARGET_CHAIN.id,
+    query: { enabled: !!address }
+  })
+
   // Approve function
   const { writeContract, data: approveHash, isPending: isApproving, error: approveError } = useWriteContract()
 
@@ -63,20 +73,34 @@ export function useHashToken() {
     })
   }
 
+  const approveSlots = async (amount?: bigint) => {
+    writeContract({
+      address: CONTRACTS.hashToken,
+      abi: HashTokenABI,
+      functionName: 'approve',
+      args: [CONTRACTS.cyberSlots, amount ?? maxUint256],
+      chainId: TARGET_CHAIN.id,
+    })
+  }
+
   const balance = balanceData ? BigInt(balanceData.toString()) : 0n
   const formattedBalance = formatEther(balance)
   const hasGameApproval = gameAllowance ? BigInt(gameAllowance.toString()) > 0n : false
   const hasStakingApproval = stakingAllowance ? BigInt(stakingAllowance.toString()) > 0n : false
+  const hasSlotsApproval = slotsAllowance ? BigInt(slotsAllowance.toString()) > 0n : false
 
   return {
     balance,
     formattedBalance,
     gameAllowance: gameAllowance ? BigInt(gameAllowance.toString()) : 0n,
     stakingAllowance: stakingAllowance ? BigInt(stakingAllowance.toString()) : 0n,
+    slotsAllowance: slotsAllowance ? BigInt(slotsAllowance.toString()) : 0n,
     hasGameApproval,
     hasStakingApproval,
+    hasSlotsApproval,
     approveGame,
     approveStaking,
+    approveSlots,
     isApproving,
     isApproveConfirming,
     isApproveConfirmed,
@@ -84,6 +108,7 @@ export function useHashToken() {
     refetchBalance,
     refetchGameAllowance,
     refetchStakingAllowance,
+    refetchSlotsAllowance,
     parseAmount: parseEther,
     formatAmount: formatEther,
   }
