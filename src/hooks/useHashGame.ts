@@ -248,26 +248,19 @@ export function useHashGame() {
     })
   }, [writeCashOut])
 
-  // Auto-resolve when target block is reached, or clear if already resolved
+  // Clear pending bet if already resolved (but don't auto-resolve - let user click REVEAL)
   useEffect(() => {
     if (pendingBetId !== null && pendingBetData && blockNumber) {
       const bet = pendingBetData as any
       const status = Number(bet[5])
-      const targetBlock = BigInt(bet[4] || bet.targetBlock || 0)
       
       // If bet is no longer pending (already resolved), clear it
       if (status !== 0) { // 0 = PENDING
         setPendingBetIdState(null)
         clearPendingBet()
-        return
-      }
-      
-      // Auto-resolve when target block is reached
-      if (blockNumber >= targetBlock) {
-        resolveBet(pendingBetId)
       }
     }
-  }, [blockNumber, pendingBetId, pendingBetData, resolveBet])
+  }, [blockNumber, pendingBetId, pendingBetData])
 
   const stats: GameStats | null = statsData ? {
     volume: BigInt((statsData as any)[0] || 0),
