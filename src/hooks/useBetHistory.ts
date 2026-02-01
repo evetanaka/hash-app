@@ -37,27 +37,43 @@ export function useBetHistory(limit = 50) {
     setError(null)
 
     try {
-      // Get last 10000 blocks (roughly 1.5 days on Sepolia)
+      // Contract was deployed around block 10165750 on Sepolia
+      const DEPLOYMENT_BLOCK = 10165750n
       const currentBlock = await publicClient.getBlockNumber()
-      const fromBlock = currentBlock > 10000n ? currentBlock - 10000n : 0n
+      
+      // Fetch in chunks of 900 blocks (under 1000 limit)
+      const CHUNK_SIZE = 900n
+      const allPlacedLogs: any[] = []
+      const allResolvedLogs: any[] = []
+      
+      let fromBlock = DEPLOYMENT_BLOCK
+      while (fromBlock < currentBlock) {
+        const toBlock = fromBlock + CHUNK_SIZE > currentBlock ? currentBlock : fromBlock + CHUNK_SIZE
+        
+        const [placedChunk, resolvedChunk] = await Promise.all([
+          publicClient.getLogs({
+            address: CONTRACTS.hashGame,
+            event: BET_PLACED_EVENT,
+            args: { player: address },
+            fromBlock,
+            toBlock,
+          }),
+          publicClient.getLogs({
+            address: CONTRACTS.hashGame,
+            event: BET_RESOLVED_EVENT,
+            args: { player: address },
+            fromBlock,
+            toBlock,
+          })
+        ])
+        
+        allPlacedLogs.push(...placedChunk)
+        allResolvedLogs.push(...resolvedChunk)
+        fromBlock = toBlock + 1n
+      }
 
-      // Fetch BetPlaced events
-      const placedLogs = await publicClient.getLogs({
-        address: CONTRACTS.hashGame,
-        event: BET_PLACED_EVENT,
-        args: { player: address },
-        fromBlock,
-        toBlock: 'latest',
-      })
-
-      // Fetch BetResolved events
-      const resolvedLogs = await publicClient.getLogs({
-        address: CONTRACTS.hashGame,
-        event: BET_RESOLVED_EVENT,
-        args: { player: address },
-        fromBlock,
-        toBlock: 'latest',
-      })
+      const placedLogs = allPlacedLogs
+      const resolvedLogs = allResolvedLogs
 
       // Create map of resolved bets
       const resolvedMap = new Map<string, { won: boolean; result: number; payout: bigint }>()
