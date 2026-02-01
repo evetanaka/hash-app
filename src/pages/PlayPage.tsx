@@ -6,6 +6,7 @@ import { useHashToken } from '../hooks/useHashToken'
 import { useHashJackpot } from '../hooks/useHashJackpot'
 import { TokenApproval } from '../components/TokenApproval'
 import { GetHashCTA } from '../components/GetHashCTA'
+import { PendingBets } from '../components/PendingBets'
 
 const GAME_MODES = {
   [GameMode.ONE_DIGIT]: { digits: 1, label: '1 DIGIT', chance: '6.25%' },
@@ -152,6 +153,9 @@ export function PlayPage() {
       <div className="md:col-span-7 flex flex-col gap-6">
         
         <GetHashCTA />
+        
+        {/* PENDING BETS */}
+        <PendingBets />
         
         {/* MODE TABS */}
         <div className="flex text-sm border-b border-white/20">
