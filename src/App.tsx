@@ -7,7 +7,7 @@ import { Header } from './components/Header'
 import { Footer } from './components/Footer'
 import { JackpotBanner } from './components/JackpotBanner'
 import { NetworkGuard } from './components/NetworkGuard'
-import { PlayPage, StakePage, HistoryPage, RefPage } from './pages'
+import { HomePage, PlayPage, StakePage, HistoryPage, RefPage } from './pages'
 
 const queryClient = new QueryClient()
 
@@ -34,7 +34,7 @@ function Layout({ children }: { children: React.ReactNode }) {
         }} 
       />
 
-      <div className="relative z-10 container mx-auto max-w-4xl p-4 flex flex-col gap-6">
+      <div className="relative z-10 container mx-auto max-w-6xl p-4 flex flex-col gap-6">
         <Header />
         <JackpotBanner />
         {children}
@@ -77,7 +77,8 @@ function App() {
             <NetworkGuard>
               <Layout>
                 <Routes>
-                  <Route path="/" element={<PlayPage />} />
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/play" element={<PlayPage />} />
                   <Route path="/stake" element={<StakePage />} />
                   <Route path="/history" element={<HistoryPage />} />
                   <Route path="/ref" element={<RefPage />} />

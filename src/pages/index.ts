@@ -1,3 +1,4 @@
+export * from './HomePage'
 export * from './PlayPage'
 export * from './StakePage'
 export * from './HistoryPage'

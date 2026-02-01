@@ -6,7 +6,8 @@ import { useHashToken } from '../hooks/useHashToken'
 import { formatEther } from 'viem'
 
 const NAV_ITEMS = [
-  { path: '/', label: 'PLAY' },
+  { path: '/', label: 'GAMES' },
+  { path: '/play', label: 'PLAY' },
   { path: '/stake', label: 'STAKE' },
   { path: '/history', label: 'HISTORY' },
   { path: '/ref', label: 'REF' },
