@@ -37,10 +37,44 @@ export interface GameStats {
   betsCount: bigint
 }
 
+// Helper to persist pending bet in localStorage
+const PENDING_BET_KEY = 'hash_pending_bet'
+
+function savePendingBet(address: string, betId: bigint) {
+  localStorage.setItem(PENDING_BET_KEY, JSON.stringify({ address, betId: betId.toString() }))
+}
+
+function loadPendingBet(address: string): bigint | null {
+  try {
+    const saved = localStorage.getItem(PENDING_BET_KEY)
+    if (saved) {
+      const { address: savedAddr, betId } = JSON.parse(saved)
+      if (savedAddr?.toLowerCase() === address?.toLowerCase()) {
+        return BigInt(betId)
+      }
+    }
+  } catch {}
+  return null
+}
+
+function clearPendingBet() {
+  localStorage.removeItem(PENDING_BET_KEY)
+}
+
 export function useHashGame() {
   const { address } = useAccount()
-  const [pendingBetId, setPendingBetId] = useState<bigint | null>(null)
+  const [pendingBetId, setPendingBetIdState] = useState<bigint | null>(null)
   const [lastResult, setLastResult] = useState<{ won: boolean; result: number; payout: bigint } | null>(null)
+  
+  // Load pending bet from localStorage on mount
+  useEffect(() => {
+    if (address && pendingBetId === null) {
+      const saved = loadPendingBet(address)
+      if (saved !== null) {
+        setPendingBetIdState(saved)
+      }
+    }
+  }, [address, pendingBetId])
 
   // Read current block
   const { data: blockNumber } = useBlockNumber({ watch: true })
@@ -154,7 +188,9 @@ export function useHashGame() {
     onLogs(logs) {
       const log = logs[0]
       if (log && address && (log as any).args?.player?.toLowerCase() === address.toLowerCase()) {
-        setPendingBetId((log as any).args.betId)
+        const betId = (log as any).args.betId
+        setPendingBetIdState(betId)
+        savePendingBet(address, betId)
       }
     },
   })
@@ -173,7 +209,8 @@ export function useHashGame() {
           result: Number(args.result),
           payout: args.payout,
         })
-        setPendingBetId(null)
+        setPendingBetIdState(null)
+        clearPendingBet()
         refetchStats()
         refetchStreak()
       }
@@ -211,12 +248,22 @@ export function useHashGame() {
     })
   }, [writeCashOut])
 
-  // Auto-resolve when target block is reached
+  // Auto-resolve when target block is reached, or clear if already resolved
   useEffect(() => {
     if (pendingBetId !== null && pendingBetData && blockNumber) {
       const bet = pendingBetData as any
+      const status = Number(bet[5])
       const targetBlock = BigInt(bet[4] || bet.targetBlock || 0)
-      if (blockNumber >= targetBlock && bet[5] === 0) { // status === PENDING
+      
+      // If bet is no longer pending (already resolved), clear it
+      if (status !== 0) { // 0 = PENDING
+        setPendingBetIdState(null)
+        clearPendingBet()
+        return
+      }
+      
+      // Auto-resolve when target block is reached
+      if (blockNumber >= targetBlock) {
         resolveBet(pendingBetId)
       }
     }
