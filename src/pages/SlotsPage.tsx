@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAccount } from 'wagmi'
 import { parseEther, formatEther } from 'viem'
 import { useHashToken } from '../hooks/useHashToken'
-import { TokenApproval } from '../components/TokenApproval'
 import { Zap, Volume2, VolumeX } from 'lucide-react'
 
 // Cyber-themed symbols (hex-inspired)
@@ -23,7 +22,6 @@ export function SlotsPage() {
   
   const [betAmount, setBetAmount] = useState('100')
   const [isSpinning, setIsSpinning] = useState(false)
-  const [reels, setReels] = useState([0, 0, 0])
   const [displayReels, setDisplayReels] = useState([0, 0, 0])
   const [lastWin, setLastWin] = useState<{ amount: string; type: string } | null>(null)
   const [soundEnabled, setSoundEnabled] = useState(true)
@@ -66,7 +64,6 @@ export function SlotsPage() {
       Math.floor(Math.random() * 16),
     ]
     
-    setReels(result)
     setDisplayReels(result)
     setIsSpinning(false)
     
@@ -235,12 +232,7 @@ export function SlotsPage() {
           </div>
         )}
         
-        {/* Token Approval if needed */}
-        {isConnected && balance > 0n && (
-          <TokenApproval target="slots">
-            <div />
-          </TokenApproval>
-        )}
+        {/* Token Approval will be added when contract is deployed */}
       </div>
       
       {/* Payout Table */}
