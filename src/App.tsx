@@ -1,5 +1,6 @@
+import { useEffect } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { WagmiProvider } from 'wagmi'
+import { WagmiProvider, useReconnect } from 'wagmi'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { config } from './config/wagmi'
 import { Header } from './components/Header'
@@ -9,6 +10,17 @@ import { NetworkGuard } from './components/NetworkGuard'
 import { PlayPage, StakePage, HistoryPage, RefPage } from './pages'
 
 const queryClient = new QueryClient()
+
+// Auto-reconnect wallet on page load
+function WalletReconnect({ children }: { children: React.ReactNode }) {
+  const { reconnect } = useReconnect()
+  
+  useEffect(() => {
+    reconnect()
+  }, [reconnect])
+  
+  return <>{children}</>
+}
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -60,18 +72,20 @@ function App() {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <NetworkGuard>
-            <Layout>
-              <Routes>
-                <Route path="/" element={<PlayPage />} />
-                <Route path="/stake" element={<StakePage />} />
-                <Route path="/history" element={<HistoryPage />} />
-                <Route path="/ref" element={<RefPage />} />
-              </Routes>
-            </Layout>
-          </NetworkGuard>
-        </BrowserRouter>
+        <WalletReconnect>
+          <BrowserRouter>
+            <NetworkGuard>
+              <Layout>
+                <Routes>
+                  <Route path="/" element={<PlayPage />} />
+                  <Route path="/stake" element={<StakePage />} />
+                  <Route path="/history" element={<HistoryPage />} />
+                  <Route path="/ref" element={<RefPage />} />
+                </Routes>
+              </Layout>
+            </NetworkGuard>
+          </BrowserRouter>
+        </WalletReconnect>
       </QueryClientProvider>
     </WagmiProvider>
   )

@@ -1,4 +1,4 @@
-import { http, createConfig } from 'wagmi'
+import { http, createConfig, createStorage } from 'wagmi'
 import { mainnet, sepolia } from 'wagmi/chains'
 import { injected } from 'wagmi/connectors'
 
@@ -22,6 +22,8 @@ export const config = createConfig({
     [mainnet.id]: http(),
     [sepolia.id]: http(),
   },
+  storage: createStorage({ storage: window.localStorage }),
+  syncConnectedChain: true,
 })
 
 declare module 'wagmi' {
