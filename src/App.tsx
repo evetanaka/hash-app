@@ -7,7 +7,7 @@ import { Header } from './components/Header'
 import { Footer } from './components/Footer'
 import { JackpotBanner } from './components/JackpotBanner'
 import { NetworkGuard } from './components/NetworkGuard'
-import { HomePage, PlayPage, StakePage, HistoryPage, RefPage } from './pages'
+import { HomePage, PlayPage, StakePage, HistoryPage, RefPage, SlotsPage } from './pages'
 
 const queryClient = new QueryClient()
 
@@ -79,6 +79,7 @@ function App() {
                 <Routes>
                   <Route path="/" element={<HomePage />} />
                   <Route path="/play" element={<PlayPage />} />
+                  <Route path="/slots" element={<SlotsPage />} />
                   <Route path="/stake" element={<StakePage />} />
                   <Route path="/history" element={<HistoryPage />} />
                   <Route path="/ref" element={<RefPage />} />

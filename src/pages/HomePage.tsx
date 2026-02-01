@@ -74,7 +74,6 @@ export function HomePage() {
       desc: 'HIGH VOLATILITY. NEON CRASH.',
       accent: 'text-purple-400',
       border: 'group-hover:border-purple-400/50',
-      disabled: true,
       stats: [
         { label: 'JACKPOT', val: liveData.slotsPool.toLocaleString(), icon: Trophy },
         { label: 'PLAYING', val: '1,204', icon: Users },
