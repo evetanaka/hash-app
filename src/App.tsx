@@ -25,10 +25,33 @@ function ConnectWallet() {
   const { disconnect } = useDisconnect()
   const [showModal, setShowModal] = useState(false)
 
-  const handleConnect = (_walletType: 'metamask' | 'keplr') => {
-    const connector = connectors.find(c => c.id === 'injected')
-    if (connector) {
-      connect({ connector })
+  const handleConnect = async (walletType: 'metamask' | 'keplr') => {
+    try {
+      if (walletType === 'keplr') {
+        // Check for Keplr
+        const keplr = (window as any).keplr
+        if (!keplr) {
+          window.open('https://www.keplr.app/download', '_blank')
+          return
+        }
+        // Keplr EVM provider
+        if (keplr.ethereum) {
+          (window as any).ethereum = keplr.ethereum
+        }
+      } else {
+        // MetaMask - check if available
+        if (!(window as any).ethereum?.isMetaMask) {
+          window.open('https://metamask.io/download/', '_blank')
+          return
+        }
+      }
+      
+      const connector = connectors.find(c => c.id === 'injected')
+      if (connector) {
+        connect({ connector })
+      }
+    } catch (err) {
+      console.error('Connection error:', err)
     }
     setShowModal(false)
   }
