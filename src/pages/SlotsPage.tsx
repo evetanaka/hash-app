@@ -29,7 +29,7 @@ const TIER_MAX_BETS: Record<number, bigint> = {
 
 export function SlotsPage() {
   const { isConnected } = useAccount()
-  const { balance, refetchBalance, slotsAllowance, approveSlots, isApproving, isApproveConfirming } = useHashToken()
+  const { balance, refetchBalance, slotsAllowance, approveSlots, isApproving, isApproveConfirming, isApproveConfirmed, refetchSlotsAllowance } = useHashToken()
   const { tierInfo, tierName } = useHashStaking()
   const {
     jackpotPool,
@@ -58,6 +58,13 @@ export function SlotsPage() {
   const minBet = parseEther('5')
   const maxBet = TIER_MAX_BETS[tierInfo?.tier ?? 0] || parseEther('100')
   
+  // Refetch allowance when approve confirmed
+  useEffect(() => {
+    if (isApproveConfirmed) {
+      refetchSlotsAllowance()
+    }
+  }, [isApproveConfirmed, refetchSlotsAllowance])
+
   // Check if approved for CyberSlots (need enough allowance)
   const needsApproval = slotsAllowance < parseEther(betAmount || '0')
   
