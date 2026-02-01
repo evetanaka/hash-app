@@ -5,6 +5,7 @@ import { useHashStaking } from '../hooks/useHashStaking'
 import { useHashToken } from '../hooks/useHashToken'
 import { TokenApproval } from '../components/TokenApproval'
 import { GetHashCTA } from '../components/GetHashCTA'
+import { TierDisplay } from '../components/TierDisplay'
 
 const TIER_COLORS: Record<string, string> = {
   'Bronze': 'text-orange-600',
@@ -294,18 +295,11 @@ export function StakePage() {
             </p>
           </div>
 
-          {/* TIER INFO */}
-          <div className="border border-white/20 p-4 text-xs">
-            <div className="font-bold mb-2">TIER BENEFITS</div>
-            <div className="space-y-1 text-gray-500">
-              <div>• Higher tiers = better payout multipliers</div>
-              <div>• Increased max bet limits</div>
-              <div>• Higher referral commission rates</div>
-              <div>• Jackpot lottery eligibility</div>
-            </div>
-          </div>
         </div>
       </div>
+
+      {/* TIER DISPLAY */}
+      <TierDisplay currentTier={tierName} stakedAmount={stakeInfo?.amount} />
     </main>
   )
 }
