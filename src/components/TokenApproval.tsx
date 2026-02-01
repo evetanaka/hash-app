@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useHashToken } from '../hooks/useHashToken'
-import { formatEther } from 'viem'
+
 
 interface TokenApprovalProps {
   target: 'game' | 'staking'
@@ -9,10 +9,11 @@ interface TokenApprovalProps {
   children: React.ReactNode
 }
 
+// Threshold for "unlimited" - if allowance is > 1 trillion tokens, consider it unlimited
+const UNLIMITED_THRESHOLD = BigInt(1e12) * BigInt(1e18)
+
 export function TokenApproval({ target, amount, onApproved, children }: TokenApprovalProps) {
   const {
-    hasGameApproval,
-    hasStakingApproval,
     gameAllowance,
     stakingAllowance,
     approveGame,
@@ -24,7 +25,6 @@ export function TokenApproval({ target, amount, onApproved, children }: TokenApp
     refetchStakingAllowance,
   } = useHashToken()
 
-  const hasApproval = target === 'game' ? hasGameApproval : hasStakingApproval
   const allowance = target === 'game' ? gameAllowance : stakingAllowance
   const approve = target === 'game' ? approveGame : approveStaking
   const refetchAllowance = target === 'game' ? refetchGameAllowance : refetchStakingAllowance
@@ -32,8 +32,10 @@ export function TokenApproval({ target, amount, onApproved, children }: TokenApp
   // Track if we've already handled this confirmation
   const hasHandledConfirmation = useRef(false)
 
-  // Check if amount exceeds allowance
-  const needsApproval = amount ? allowance < amount : !hasApproval
+  // Check if we have "unlimited" approval (> threshold) or at least enough for current amount
+  const hasUnlimitedApproval = allowance >= UNLIMITED_THRESHOLD
+  const hasEnoughForAmount = amount ? allowance >= amount : false
+  const needsApproval = !hasUnlimitedApproval && !hasEnoughForAmount
 
   // Refetch allowance when approval is confirmed
   useEffect(() => {
@@ -69,23 +71,21 @@ export function TokenApproval({ target, amount, onApproved, children }: TokenApp
       <div className="flex items-start gap-3">
         <div className="text-2xl">🔐</div>
         <div className="flex-1">
-          <h3 className="font-bold text-yellow-500 mb-1">APPROVAL REQUIRED</h3>
+          <h3 className="font-bold text-yellow-500 mb-1">ONE-TIME APPROVAL</h3>
           <p className="text-sm text-gray-400 mb-3">
             Allow the {target === 'game' ? 'Hash Game' : 'Staking'} contract to spend your $HASH tokens.
-            {amount && (
-              <span className="block mt-1 text-white">
-                Amount needed: {formatEther(amount)} $HASH
-              </span>
-            )}
+            <span className="block mt-1 text-gray-500 text-xs">
+              This is a one-time approval. You won't need to approve again.
+            </span>
           </p>
           <button
-            onClick={() => approve(amount)}
+            onClick={() => approve()} // Always approve unlimited (maxUint256)
             disabled={isPending}
             className="px-4 py-2 font-bold border border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-black transition-colors disabled:opacity-50 text-sm"
           >
             {isApproving ? 'CONFIRM IN WALLET...' : 
              isApproveConfirming ? 'PROCESSING...' : 
-             'APPROVE $HASH'}
+             'APPROVE $HASH (ONE TIME)'}
           </button>
         </div>
       </div>

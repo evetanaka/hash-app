@@ -223,7 +223,7 @@ export function StakePage() {
             <div className="border border-white p-6">
               <h2 className="text-lg font-bold mb-4 border-b border-white/20 pb-2">STAKE $HASH</h2>
               
-              <TokenApproval target="staking" amount={stakeAmountBigInt}>
+              <TokenApproval target="staking">
                 <div className="space-y-4">
                   <div>
                     <div className="text-xs text-gray-500 mb-2">STAKE AMOUNT</div>

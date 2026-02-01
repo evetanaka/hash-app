@@ -295,7 +295,7 @@ export function PlayPage() {
 
         {/* Token Approval */}
         {isConnected && balance > 0n && !hasGameApproval && (
-          <TokenApproval target="game" amount={betAmountBigInt}>
+          <TokenApproval target="game">
             <div />
           </TokenApproval>
         )}
