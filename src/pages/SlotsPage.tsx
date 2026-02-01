@@ -28,8 +28,8 @@ const TIER_MAX_BETS: Record<number, bigint> = {
 }
 
 export function SlotsPage() {
-  const { isConnected, address } = useAccount()
-  const { balance, refetchBalance, slotsAllowance, hasSlotsApproval, approveSlots, isApproving, isApproveConfirming, refetchSlotsAllowance } = useHashToken()
+  const { isConnected } = useAccount()
+  const { balance, refetchBalance, slotsAllowance, approveSlots, isApproving, isApproveConfirming } = useHashToken()
   const { tierInfo, tierName } = useHashStaking()
   const {
     jackpotPool,
@@ -62,7 +62,7 @@ export function SlotsPage() {
   const needsApproval = slotsAllowance < parseEther(betAmount || '0')
   
   // Is there a pending spin?
-  const hasPendingSpin = pendingSpinId && pendingSpinId > 0n && pendingSpin?.status === SpinStatus.PENDING
+  const hasPendingSpin = !!(pendingSpinId && pendingSpinId > 0n && pendingSpin?.status === SpinStatus.PENDING)
   
   // Animation effect for reels when waiting for block
   useEffect(() => {
