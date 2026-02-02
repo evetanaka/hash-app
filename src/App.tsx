@@ -74,6 +74,10 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <WalletReconnect>
           <BrowserRouter>
+            {/* Testnet Banner */}
+            <div className="bg-orange-500 text-black text-center py-2 px-4 text-sm font-bold">
+              ⚠️ TESTNET MODE — This is running on Sepolia. Tokens have no real value.
+            </div>
             <NetworkGuard>
               <Layout>
                 <Routes>
