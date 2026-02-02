@@ -70,18 +70,19 @@ export function SlotsPage() {
   const needsApproval = slotsAllowance < parseEther(betAmount || '0')
   
   // Animation while spinning (starts immediately on click)
+  // Locked reels stay fixed, only unlocked ones animate
   useEffect(() => {
     if (spinInitiated) {
       const interval = setInterval(() => {
-        setDisplayReels([
-          Math.floor(Math.random() * 16),
-          Math.floor(Math.random() * 16),
-          Math.floor(Math.random() * 16),
+        setDisplayReels(prev => [
+          lockedReels[0] ? prev[0] : Math.floor(Math.random() * 16),
+          lockedReels[1] ? prev[1] : Math.floor(Math.random() * 16),
+          lockedReels[2] ? prev[2] : Math.floor(Math.random() * 16),
         ])
       }, 50)
       return () => clearInterval(interval)
     }
-  }, [spinInitiated])
+  }, [spinInitiated, lockedReels])
   
   // Update display when result arrives
   useEffect(() => {
