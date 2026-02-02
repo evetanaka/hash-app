@@ -2,11 +2,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAccount } from 'wagmi'
 import { parseEther, formatEther } from 'viem'
 import { useHashToken } from '../hooks/useHashToken'
-import { useCyberSlots, SpinStatus, WinType } from '../hooks/useCyberSlots'
+import { useCyberSlots, WinType } from '../hooks/useCyberSlots'
 import { useHashStaking } from '../hooks/useHashStaking'
 import { Zap, Volume2, VolumeX } from 'lucide-react'
 
-// Cyber-themed symbols (hex-inspired)
+// Cyber-themed symbols
 const SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '🔔', '💎', '⭐', '7️⃣', '💀', '👑', '🚀', '⚡', '🎰', '💜', '🔮', '☠️']
 const SYMBOL_NAMES = ['CHERRY', 'LEMON', 'ORANGE', 'GRAPE', 'BELL', 'DIAMOND', 'STAR', 'SEVEN', 'SKULL', 'CROWN', 'ROCKET', 'BOLT', 'SLOT', 'NEON', 'CYBER', 'JACKPOT']
 
@@ -33,24 +33,17 @@ export function SlotsPage() {
   const { tierInfo, tierName } = useHashStaking()
   const {
     jackpotPool,
-    pendingSpin,
-    pendingSpinId,
-    canResolve,
-    blockNumber,
+    lastResult,
     gameStats,
     spin,
-    resolve,
+    clearResult,
     isSpinning,
     isSpinConfirming,
-    isResolving,
-    isResolveConfirming,
     refetchJackpot,
-    refetchStats,
   } = useCyberSlots()
   
   const [betAmount, setBetAmount] = useState('100')
   const [displayReels, setDisplayReels] = useState([0, 0, 0])
-  const [lastWin, setLastWin] = useState<{ amount: string; type: string } | null>(null)
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [spinHistory, setSpinHistory] = useState<Array<{ reels: number[]; win: bigint; type: number }>>([])
   
@@ -64,16 +57,13 @@ export function SlotsPage() {
       refetchSlotsAllowance()
     }
   }, [isApproveConfirmed, refetchSlotsAllowance])
-
-  // Check if approved for CyberSlots (need enough allowance)
+  
+  // Check if approved for CyberSlots
   const needsApproval = slotsAllowance < parseEther(betAmount || '0')
   
-  // Is there a pending spin?
-  const hasPendingSpin = !!(pendingSpinId && pendingSpinId > 0n && pendingSpin?.status === SpinStatus.PENDING)
-  
-  // Animation effect for reels when waiting for block
+  // Animation while spinning
   useEffect(() => {
-    if (hasPendingSpin && !canResolve) {
+    if (isSpinning || isSpinConfirming) {
       const interval = setInterval(() => {
         setDisplayReels([
           Math.floor(Math.random() * 16),
@@ -83,60 +73,49 @@ export function SlotsPage() {
       }, 50)
       return () => clearInterval(interval)
     }
-  }, [hasPendingSpin, canResolve])
+  }, [isSpinning, isSpinConfirming])
   
-  // Auto-resolve when block is ready
+  // Update display when result arrives
   useEffect(() => {
-    if (canResolve && pendingSpinId && !isResolving && !isResolveConfirming) {
-      resolve(pendingSpinId)
-    }
-  }, [canResolve, pendingSpinId, resolve, isResolving, isResolveConfirming])
-  
-  // Update display when spin resolved
-  useEffect(() => {
-    if (pendingSpin?.status === SpinStatus.RESOLVED && pendingSpin.result) {
-      setDisplayReels([...pendingSpin.result])
+    if (lastResult) {
+      setDisplayReels([...lastResult.result])
       
-      if (pendingSpin.winType !== WinType.NONE) {
-        const winTypeNames = ['NONE', 'TWO_OF_KIND', 'SEQUENTIAL', 'THREE_OF_KIND', 'JACKPOT']
-        setLastWin({
-          amount: formatEther(pendingSpin.payout),
-          type: winTypeNames[pendingSpin.winType]
-        })
-        
-        // Add to history
-        setSpinHistory(prev => [{
-          reels: [...pendingSpin.result],
-          win: pendingSpin.payout,
-          type: pendingSpin.winType
-        }, ...prev].slice(0, 10))
-      } else {
-        setSpinHistory(prev => [{
-          reels: [...pendingSpin.result],
-          win: 0n,
-          type: WinType.NONE
-        }, ...prev].slice(0, 10))
-      }
+      // Add to history
+      setSpinHistory(prev => [{
+        reels: [...lastResult.result],
+        win: lastResult.payout,
+        type: lastResult.winType
+      }, ...prev].slice(0, 10))
       
       refetchBalance()
       refetchJackpot()
-      refetchStats()
     }
-  }, [pendingSpin?.status, pendingSpin?.result, pendingSpin?.winType, pendingSpin?.payout, refetchBalance, refetchJackpot, refetchStats])
+  }, [lastResult, refetchBalance, refetchJackpot])
   
   const handleSpin = useCallback(() => {
-    if (isSpinning || isSpinConfirming || hasPendingSpin) return
+    if (isSpinning || isSpinConfirming) return
     
     const amount = parseEther(betAmount || '0')
     if (amount < minBet || amount > maxBet || amount > balance) return
     
-    setLastWin(null)
+    clearResult()
     spin(amount)
-  }, [betAmount, balance, minBet, maxBet, isSpinning, isSpinConfirming, hasPendingSpin, spin])
+  }, [betAmount, balance, minBet, maxBet, isSpinning, isSpinConfirming, clearResult, spin])
   
-  const isProcessing = isSpinning || isSpinConfirming || isResolving || isResolveConfirming || hasPendingSpin
+  const isProcessing = isSpinning || isSpinConfirming
   const betAmountBigInt = parseEther(betAmount || '0')
   const canSpin = betAmountBigInt >= minBet && betAmountBigInt <= maxBet && betAmountBigInt <= balance && !isProcessing && !needsApproval
+
+  // Win type to display string
+  const getWinTypeDisplay = (type: number) => {
+    switch (type) {
+      case WinType.JACKPOT: return 'JACKPOT!!!'
+      case WinType.THREE_OF_KIND: return 'THREE OF A KIND!'
+      case WinType.SEQUENTIAL: return 'SEQUENTIAL!'
+      case WinType.TWO_OF_KIND: return 'TWO OF A KIND!'
+      default: return ''
+    }
+  }
 
   return (
     <main className="max-w-4xl mx-auto mt-4">
@@ -146,7 +125,7 @@ export function SlotsPage() {
           <h1 className="text-2xl font-bold text-purple-400 flex items-center gap-2">
             <Zap className="text-purple-400" /> CYBER_SLOTS
           </h1>
-          <p className="text-gray-500 text-sm">HIGH VOLATILITY. NEON CRASH.</p>
+          <p className="text-gray-500 text-sm">HIGH VOLATILITY. INSTANT RESULTS.</p>
         </div>
         <button 
           onClick={() => setSoundEnabled(!soundEnabled)}
@@ -179,8 +158,8 @@ export function SlotsPage() {
                 bg-gray-900 border-2 border-purple-400/50 
                 flex items-center justify-center text-5xl md:text-6xl
                 transition-all duration-100
-                ${hasPendingSpin && !canResolve ? 'animate-pulse border-purple-400' : ''}
-                ${lastWin && lastWin.type !== 'NONE' ? 'border-green-400 shadow-[0_0_20px_rgba(74,222,128,0.5)]' : ''}
+                ${isProcessing ? 'animate-pulse border-purple-400' : ''}
+                ${lastResult && lastResult.winType !== WinType.NONE ? 'border-green-400 shadow-[0_0_20px_rgba(74,222,128,0.5)]' : ''}
               `}
             >
               {SYMBOLS[symbol]}
@@ -197,21 +176,24 @@ export function SlotsPage() {
           ))}
         </div>
         
-        {/* Status display */}
+        {/* Result display */}
         <div className="h-20 flex items-center justify-center mb-4">
-          {lastWin && lastWin.type !== 'NONE' ? (
+          {lastResult && lastResult.winType !== WinType.NONE ? (
             <div className="text-center animate-bounce">
               <div className="text-2xl font-bold text-green-400">
-                🎉 {lastWin.type === 'JACKPOT' ? 'JACKPOT!!!' : 'WINNER!'} 🎉
+                🎉 {getWinTypeDisplay(lastResult.winType)} 🎉
               </div>
-              <div className="text-xl text-white">+{Number(lastWin.amount).toLocaleString()} $HASH</div>
+              <div className="text-xl text-white">+{Number(formatEther(lastResult.payout)).toLocaleString()} $HASH</div>
             </div>
-          ) : hasPendingSpin ? (
+          ) : isProcessing ? (
             <div className="text-center">
               <div className="text-xl text-purple-400 animate-pulse">
-                {canResolve ? '⏳ Resolving...' : `⏳ Block ${pendingSpin?.targetBlock?.toString()}...`}
+                🎰 Spinning...
               </div>
-              <div className="text-xs text-gray-500">Current: #{blockNumber.toString()}</div>
+            </div>
+          ) : lastResult && lastResult.winType === WinType.NONE ? (
+            <div className="text-center text-gray-500">
+              No win. Try again!
             </div>
           ) : null}
         </div>

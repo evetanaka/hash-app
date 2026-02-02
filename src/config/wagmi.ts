@@ -8,7 +8,7 @@ export const CONTRACTS = {
   hashStaking: '0x0d2B19D4Eb51887cb22a1B69e5FD903ff3c602Fb' as `0x${string}`,
   hashJackpot: '0x4760Ad151103428c4bBfdc710EDc859e85703899' as `0x${string}`,
   hashGame: '0xDDCE0B582F2711a18A62Ce06569C5ea2d7375445' as `0x${string}`,
-  cyberSlots: '0x45B865cfA5F83BF5A022717be875e45Ae1d00B43' as `0x${string}`,
+  cyberSlots: '0xb023A89501D2b3608C02755c31727895C02c3C86' as `0x${string}`,
 }
 
 // Target chain for the app

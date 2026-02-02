@@ -1,13 +1,8 @@
-import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount, useBlockNumber } from 'wagmi'
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi'
 import { useState, useEffect, useCallback } from 'react'
 import { CONTRACTS, TARGET_CHAIN } from '../config/wagmi'
 import { CyberSlotsABI } from '../abi/CyberSlotsABI'
-
-export const SpinStatus = {
-  PENDING: 0,
-  RESOLVED: 1,
-  EXPIRED: 2,
-} as const
+import { decodeEventLog } from 'viem'
 
 export const WinType = {
   NONE: 0,
@@ -17,11 +12,8 @@ export const WinType = {
   JACKPOT: 4,
 } as const
 
-export interface Spin {
-  player: `0x${string}`
-  amount: bigint
-  targetBlock: bigint
-  status: number
+export interface SpinResult {
+  spinId: bigint
   result: [number, number, number]
   winType: number
   payout: bigint
@@ -29,10 +21,7 @@ export interface Spin {
 
 export function useCyberSlots() {
   const { address } = useAccount()
-  const [pendingSpinId, setPendingSpinId] = useState<bigint | null>(null)
-  const [lastResult, setLastResult] = useState<{ won: boolean; result: [number, number, number]; payout: bigint; winType: number } | null>(null)
-  
-  const { data: blockNumber } = useBlockNumber({ watch: true })
+  const [lastResult, setLastResult] = useState<SpinResult | null>(null)
   
   // Read jackpot pool
   const { data: jackpotPool, refetch: refetchJackpot } = useReadContract({
@@ -50,69 +39,41 @@ export function useCyberSlots() {
     chainId: TARGET_CHAIN.id,
   })
   
-  // Read pending spin for user
-  const { data: pendingSpinIdData, refetch: refetchPending } = useReadContract({
-    address: CONTRACTS.cyberSlots,
-    abi: CyberSlotsABI,
-    functionName: 'playerPendingSpinId',
-    args: address ? [address] : undefined,
-    chainId: TARGET_CHAIN.id,
-    query: { enabled: !!address }
-  })
-  
-  // Read pending spin details
-  const { data: pendingSpinData } = useReadContract({
-    address: CONTRACTS.cyberSlots,
-    abi: CyberSlotsABI,
-    functionName: 'spins',
-    args: pendingSpinId ? [pendingSpinId] : undefined,
-    chainId: TARGET_CHAIN.id,
-    query: { enabled: !!pendingSpinId && pendingSpinId > 0n }
-  })
-  
-  // Check if can resolve
-  const { data: canResolveData } = useReadContract({
-    address: CONTRACTS.cyberSlots,
-    abi: CyberSlotsABI,
-    functionName: 'canResolve',
-    args: pendingSpinId ? [pendingSpinId] : undefined,
-    chainId: TARGET_CHAIN.id,
-    query: { enabled: !!pendingSpinId && pendingSpinId > 0n }
-  })
-  
-  // Update pending spin ID
-  useEffect(() => {
-    if (pendingSpinIdData !== undefined) {
-      const id = BigInt(pendingSpinIdData.toString())
-      setPendingSpinId(id > 0n ? id : null)
-    }
-  }, [pendingSpinIdData])
-  
   // Spin transaction
-  const { writeContract: writeSpin, data: spinTxHash, isPending: isSpinning } = useWriteContract()
-  const { isLoading: isSpinConfirming, isSuccess: spinConfirmed } = useWaitForTransactionReceipt({ hash: spinTxHash })
+  const { writeContract: writeSpin, data: spinTxHash, isPending: isSpinning, reset: resetSpin } = useWriteContract()
+  const { data: spinReceipt, isLoading: isSpinConfirming, isSuccess: spinConfirmed } = useWaitForTransactionReceipt({ hash: spinTxHash })
   
-  // Resolve transaction
-  const { writeContract: writeResolve, data: resolveTxHash, isPending: isResolving } = useWriteContract()
-  const { isLoading: isResolveConfirming, isSuccess: resolveConfirmed } = useWaitForTransactionReceipt({ hash: resolveTxHash })
-  
-  // Refetch after spin confirmed
+  // Parse spin result from transaction receipt
   useEffect(() => {
-    if (spinConfirmed) {
-      refetchPending()
+    if (spinReceipt && spinConfirmed) {
+      // Find SpinCompleted event in logs
+      for (const log of spinReceipt.logs) {
+        try {
+          const decoded = decodeEventLog({
+            abi: CyberSlotsABI,
+            data: log.data,
+            topics: log.topics,
+          })
+          
+          if (decoded.eventName === 'SpinCompleted') {
+            const args = decoded.args as any
+            setLastResult({
+              spinId: args.spinId,
+              result: args.result as [number, number, number],
+              winType: Number(args.winType),
+              payout: args.payout,
+            })
+            break
+          }
+        } catch {
+          // Not our event, continue
+        }
+      }
+      
       refetchJackpot()
       refetchStats()
     }
-  }, [spinConfirmed, refetchPending, refetchJackpot, refetchStats])
-  
-  // Refetch after resolve confirmed
-  useEffect(() => {
-    if (resolveConfirmed) {
-      refetchPending()
-      refetchJackpot()
-      refetchStats()
-    }
-  }, [resolveConfirmed, refetchPending, refetchJackpot, refetchStats])
+  }, [spinReceipt, spinConfirmed, refetchJackpot, refetchStats])
   
   // Place spin
   const spin = useCallback((amount: bigint) => {
@@ -126,28 +87,6 @@ export function useCyberSlots() {
     })
   }, [writeSpin])
   
-  // Resolve spin
-  const resolve = useCallback((spinId: bigint) => {
-    writeResolve({
-      address: CONTRACTS.cyberSlots,
-      abi: CyberSlotsABI,
-      functionName: 'resolve',
-      args: [spinId],
-      chainId: TARGET_CHAIN.id,
-    })
-  }, [writeResolve])
-  
-  // Parse pending spin
-  const pendingSpin: Spin | null = pendingSpinData ? {
-    player: (pendingSpinData as any)[0],
-    amount: BigInt((pendingSpinData as any)[1]),
-    targetBlock: BigInt((pendingSpinData as any)[2]),
-    status: Number((pendingSpinData as any)[3]),
-    result: (pendingSpinData as any)[4] as [number, number, number],
-    winType: Number((pendingSpinData as any)[5]),
-    payout: BigInt((pendingSpinData as any)[6]),
-  } : null
-  
   // Parse stats
   const gameStats = stats ? {
     totalSpins: BigInt((stats as any)[0]),
@@ -160,27 +99,20 @@ export function useCyberSlots() {
   return {
     // State
     jackpotPool: jackpotPool ? BigInt(jackpotPool.toString()) : 0n,
-    pendingSpin,
-    pendingSpinId,
     lastResult,
-    canResolve: !!canResolveData,
-    blockNumber: blockNumber || 0n,
     gameStats,
     
     // Actions
     spin,
-    resolve,
     clearResult: () => setLastResult(null),
+    resetSpin,
     
     // Loading states
     isSpinning,
     isSpinConfirming,
-    isResolving,
-    isResolveConfirming,
     
     // Refetch
     refetchJackpot,
     refetchStats,
-    refetchPending,
   }
 }
