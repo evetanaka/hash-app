@@ -46,6 +46,7 @@ export function SlotsPage() {
   const [displayReels, setDisplayReels] = useState([0, 0, 0])
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [spinHistory, setSpinHistory] = useState<Array<{ reels: number[]; win: bigint; type: number }>>([])
+  const [spinInitiated, setSpinInitiated] = useState(false)
   
   // Calculate limits
   const minBet = parseEther('5')
@@ -61,9 +62,9 @@ export function SlotsPage() {
   // Check if approved for CyberSlots
   const needsApproval = slotsAllowance < parseEther(betAmount || '0')
   
-  // Animation while spinning
+  // Animation while spinning (starts immediately on click)
   useEffect(() => {
-    if (isSpinning || isSpinConfirming) {
+    if (spinInitiated) {
       const interval = setInterval(() => {
         setDisplayReels([
           Math.floor(Math.random() * 16),
@@ -73,11 +74,12 @@ export function SlotsPage() {
       }, 50)
       return () => clearInterval(interval)
     }
-  }, [isSpinning, isSpinConfirming])
+  }, [spinInitiated])
   
   // Update display when result arrives
   useEffect(() => {
     if (lastResult) {
+      setSpinInitiated(false) // Stop animation
       setDisplayReels([...lastResult.result])
       
       // Add to history
@@ -93,16 +95,17 @@ export function SlotsPage() {
   }, [lastResult, refetchBalance, refetchJackpot])
   
   const handleSpin = useCallback(() => {
-    if (isSpinning || isSpinConfirming) return
+    if (spinInitiated || isSpinning || isSpinConfirming) return
     
     const amount = parseEther(betAmount || '0')
     if (amount < minBet || amount > maxBet || amount > balance) return
     
+    setSpinInitiated(true) // Start animation immediately
     clearResult()
     spin(amount)
-  }, [betAmount, balance, minBet, maxBet, isSpinning, isSpinConfirming, clearResult, spin])
+  }, [betAmount, balance, minBet, maxBet, spinInitiated, isSpinning, isSpinConfirming, clearResult, spin])
   
-  const isProcessing = isSpinning || isSpinConfirming
+  const isProcessing = spinInitiated || isSpinning || isSpinConfirming
   const betAmountBigInt = parseEther(betAmount || '0')
   const canSpin = betAmountBigInt >= minBet && betAmountBigInt <= maxBet && betAmountBigInt <= balance && !isProcessing && !needsApproval
 
