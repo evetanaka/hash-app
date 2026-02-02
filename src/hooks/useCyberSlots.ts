@@ -1,4 +1,4 @@
-import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi'
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { useState, useEffect, useCallback } from 'react'
 import { CONTRACTS, TARGET_CHAIN } from '../config/wagmi'
 import { CyberSlotsABI } from '../abi/CyberSlotsABI'
@@ -20,7 +20,6 @@ export interface SpinResult {
 }
 
 export function useCyberSlots() {
-  const { address } = useAccount()
   const [lastResult, setLastResult] = useState<SpinResult | null>(null)
   
   // Read jackpot pool
