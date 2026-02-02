@@ -35,6 +35,7 @@ export function SlotsPage() {
     jackpotPool,
     lastResult,
     gameStats,
+    spinHistory: onchainHistory,
     spin,
     clearResult,
     isSpinning,
@@ -45,7 +46,6 @@ export function SlotsPage() {
   const [betAmount, setBetAmount] = useState('100')
   const [displayReels, setDisplayReels] = useState([0, 0, 0])
   const [soundEnabled, setSoundEnabled] = useState(true)
-  const [spinHistory, setSpinHistory] = useState<Array<{ reels: number[]; win: bigint; type: number }>>([])
   const [spinInitiated, setSpinInitiated] = useState(false)
   
   // Calculate limits
@@ -81,14 +81,6 @@ export function SlotsPage() {
     if (lastResult) {
       setSpinInitiated(false) // Stop animation
       setDisplayReels([...lastResult.result])
-      
-      // Add to history
-      setSpinHistory(prev => [{
-        reels: [...lastResult.result],
-        win: lastResult.payout,
-        type: lastResult.winType
-      }, ...prev].slice(0, 10))
-      
       refetchBalance()
       refetchJackpot()
     }
@@ -304,16 +296,16 @@ export function SlotsPage() {
         <div className="bg-black border border-purple-500/30 p-4">
           <h3 className="text-sm font-bold text-purple-400 mb-3 uppercase">Recent Spins</h3>
           <div className="space-y-1 text-xs max-h-32 overflow-y-auto">
-            {spinHistory.length === 0 ? (
+            {onchainHistory.length === 0 ? (
               <div className="text-gray-600">No spins yet...</div>
             ) : (
-              spinHistory.map((spin, i) => (
+              onchainHistory.map((spin, i) => (
                 <div key={i} className="flex justify-between items-center">
                   <span className="font-mono">
-                    {spin.reels.map(r => SYMBOLS[r]).join('')}
+                    {spin.result.map(r => SYMBOLS[r]).join('')}
                   </span>
-                  <span className={spin.win > 0n ? 'text-green-400' : 'text-red-400'}>
-                    {spin.win > 0n ? `+${Number(formatEther(spin.win)).toLocaleString()}` : '-'}
+                  <span className={spin.payout > 0n ? 'text-green-400' : 'text-red-400'}>
+                    {spin.payout > 0n ? `+${Number(formatEther(spin.payout)).toLocaleString()}` : '-'}
                   </span>
                 </div>
               ))

@@ -62,6 +62,30 @@ export const CyberSlotsABI = [
     stateMutability: "view",
     type: "function"
   },
+  {
+    inputs: [
+      { name: "player", type: "address" },
+      { name: "limit", type: "uint256" },
+      { name: "offset", type: "uint256" }
+    ],
+    name: "getPlayerSpins",
+    outputs: [
+      {
+        components: [
+          { name: "player", type: "address" },
+          { name: "amount", type: "uint256" },
+          { name: "result", type: "uint8[3]" },
+          { name: "winType", type: "uint8" },
+          { name: "payout", type: "uint256" },
+          { name: "timestamp", type: "uint256" }
+        ],
+        name: "",
+        type: "tuple[]"
+      }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
   // Write functions
   {
     inputs: [{ name: "amount", type: "uint256" }],

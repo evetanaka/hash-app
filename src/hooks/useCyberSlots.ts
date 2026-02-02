@@ -1,4 +1,4 @@
-import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi'
 import { useState, useEffect, useCallback } from 'react'
 import { CONTRACTS, TARGET_CHAIN } from '../config/wagmi'
 import { CyberSlotsABI } from '../abi/CyberSlotsABI'
@@ -19,7 +19,17 @@ export interface SpinResult {
   payout: bigint
 }
 
+export interface SpinHistory {
+  player: string
+  amount: bigint
+  result: [number, number, number]
+  winType: number
+  payout: bigint
+  timestamp: bigint
+}
+
 export function useCyberSlots() {
+  const { address } = useAccount()
   const [lastResult, setLastResult] = useState<SpinResult | null>(null)
   
   // Read jackpot pool
@@ -36,6 +46,16 @@ export function useCyberSlots() {
     abi: CyberSlotsABI,
     functionName: 'getStats',
     chainId: TARGET_CHAIN.id,
+  })
+  
+  // Read player spin history
+  const { data: spinHistoryData, refetch: refetchHistory } = useReadContract({
+    address: CONTRACTS.cyberSlots,
+    abi: CyberSlotsABI,
+    functionName: 'getPlayerSpins',
+    args: address ? [address, BigInt(10), BigInt(0)] : undefined,
+    chainId: TARGET_CHAIN.id,
+    query: { enabled: !!address }
   })
   
   // Spin transaction
@@ -71,8 +91,9 @@ export function useCyberSlots() {
       
       refetchJackpot()
       refetchStats()
+      refetchHistory()
     }
-  }, [spinReceipt, spinConfirmed, refetchJackpot, refetchStats])
+  }, [spinReceipt, spinConfirmed, refetchJackpot, refetchStats, refetchHistory])
   
   // Place spin
   const spin = useCallback((amount: bigint) => {
@@ -95,11 +116,22 @@ export function useCyberSlots() {
     jackpotPool: BigInt((stats as any)[4]),
   } : null
   
+  // Parse spin history
+  const spinHistory: SpinHistory[] = spinHistoryData ? (spinHistoryData as any[]).map((s: any) => ({
+    player: s.player,
+    amount: BigInt(s.amount),
+    result: s.result as [number, number, number],
+    winType: Number(s.winType),
+    payout: BigInt(s.payout),
+    timestamp: BigInt(s.timestamp),
+  })) : []
+  
   return {
     // State
     jackpotPool: jackpotPool ? BigInt(jackpotPool.toString()) : 0n,
     lastResult,
     gameStats,
+    spinHistory,
     
     // Actions
     spin,
