@@ -4,7 +4,7 @@ import { parseEther, formatEther } from 'viem'
 import { useHashToken } from '../hooks/useHashToken'
 import { useCyberSlots, WinType } from '../hooks/useCyberSlots'
 import { useHashStaking } from '../hooks/useHashStaking'
-import { Zap, Volume2, VolumeX } from 'lucide-react'
+import { Zap, Volume2, VolumeX, Lock, RotateCcw } from 'lucide-react'
 
 // Cyber-themed symbols
 const SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '🔔', '💎', '⭐', '7️⃣', '💀', '👑', '🚀', '⚡', '🎰', '💜', '🔮', '☠️']
@@ -36,17 +36,24 @@ export function SlotsPage() {
     lastResult,
     gameStats,
     spinHistory: onchainHistory,
+    respinInfo,
     spin,
+    lockAndRespin,
     clearResult,
     isSpinning,
     isSpinConfirming,
+    isRespinning,
+    isRespinConfirming,
     refetchJackpot,
+    refetchCanRespin,
   } = useCyberSlots()
   
   const [betAmount, setBetAmount] = useState('100')
   const [displayReels, setDisplayReels] = useState([0, 0, 0])
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [spinInitiated, setSpinInitiated] = useState(false)
+  const [lockedReels, setLockedReels] = useState<[boolean, boolean, boolean]>([false, false, false])
+  const [showRespinUI, setShowRespinUI] = useState(false)
   
   // Calculate limits
   const minBet = parseEther('5')
@@ -81,10 +88,21 @@ export function SlotsPage() {
     if (lastResult) {
       setSpinInitiated(false) // Stop animation
       setDisplayReels([...lastResult.result])
+      setLockedReels([false, false, false]) // Reset locks
       refetchBalance()
       refetchJackpot()
+      refetchCanRespin()
+      // Show respin UI after a short delay
+      setTimeout(() => setShowRespinUI(true), 500)
     }
-  }, [lastResult, refetchBalance, refetchJackpot])
+  }, [lastResult, refetchBalance, refetchJackpot, refetchCanRespin])
+  
+  // Hide respin UI when starting new spin
+  useEffect(() => {
+    if (spinInitiated || isRespinning || isRespinConfirming) {
+      setShowRespinUI(false)
+    }
+  }, [spinInitiated, isRespinning, isRespinConfirming])
   
   const handleSpin = useCallback(() => {
     if (spinInitiated || isSpinning || isSpinConfirming) return
@@ -93,11 +111,33 @@ export function SlotsPage() {
     if (amount < minBet || amount > maxBet || amount > balance) return
     
     setSpinInitiated(true) // Start animation immediately
+    setLockedReels([false, false, false])
+    setShowRespinUI(false)
     clearResult()
     spin(amount)
   }, [betAmount, balance, minBet, maxBet, spinInitiated, isSpinning, isSpinConfirming, clearResult, spin])
   
-  const isProcessing = spinInitiated || isSpinning || isSpinConfirming
+  const handleRespin = useCallback(() => {
+    if (isRespinning || isRespinConfirming) return
+    
+    const lockCount = lockedReels.filter(Boolean).length
+    if (lockCount === 0 || lockCount === 3) return
+    
+    setSpinInitiated(true)
+    lockAndRespin(lockedReels[0], lockedReels[1], lockedReels[2])
+  }, [lockedReels, isRespinning, isRespinConfirming, lockAndRespin])
+  
+  const toggleLock = (index: number) => {
+    if (!respinInfo?.eligible || isRespinning || isRespinConfirming) return
+    const newLocks: [boolean, boolean, boolean] = [...lockedReels]
+    newLocks[index] = !newLocks[index]
+    setLockedReels(newLocks)
+  }
+  
+  const isProcessing = spinInitiated || isSpinning || isSpinConfirming || isRespinning || isRespinConfirming
+  const lockCount = lockedReels.filter(Boolean).length
+  const respinCost = lockCount === 1 ? respinInfo?.cost1Lock : lockCount === 2 ? respinInfo?.cost2Lock : 0n
+  const canRespin = respinInfo?.eligible && lockCount > 0 && lockCount < 3 && (respinCost || 0n) <= balance
   const betAmountBigInt = parseEther(betAmount || '0')
   const canSpin = betAmountBigInt >= minBet && betAmountBigInt <= maxBet && betAmountBigInt <= balance && !isProcessing && !needsApproval
 
@@ -143,21 +183,40 @@ export function SlotsPage() {
       <div className="bg-black border-2 border-purple-500/50 p-6 mb-6 relative overflow-hidden w-full">
         <div className="absolute inset-0 bg-gradient-to-b from-purple-500/10 to-transparent pointer-events-none" />
         
-        {/* Reels */}
+        {/* Reels - Clickable for Lock & Respin */}
         <div className="flex justify-center gap-4 mb-6">
           {displayReels.map((symbol, i) => (
             <div 
               key={i}
+              onClick={() => showRespinUI && respinInfo?.eligible && toggleLock(i)}
               className={`
-                w-24 h-24 md:w-32 md:h-32 flex-shrink-0
-                bg-gray-900 border-2 border-purple-400/50 
+                w-24 h-24 md:w-32 md:h-32 flex-shrink-0 relative
+                bg-gray-900 border-2 
                 flex items-center justify-center text-5xl md:text-6xl
-                transition-all duration-100
-                ${isProcessing ? 'animate-pulse border-purple-400' : ''}
-                ${lastResult && lastResult.winType !== WinType.NONE ? 'border-green-400 shadow-[0_0_20px_rgba(74,222,128,0.5)]' : ''}
+                transition-all duration-200
+                ${isProcessing && !lockedReels[i] ? 'animate-pulse border-purple-400' : ''}
+                ${lastResult && lastResult.winType !== WinType.NONE && !showRespinUI ? 'border-green-400 shadow-[0_0_20px_rgba(74,222,128,0.5)]' : ''}
+                ${lockedReels[i] ? 'border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.4)]' : 'border-purple-400/50'}
+                ${showRespinUI && respinInfo?.eligible && !lockedReels[i] ? 'cursor-pointer hover:border-yellow-400/70 hover:scale-105' : ''}
               `}
             >
               {SYMBOLS[symbol]}
+              
+              {/* Lock overlay */}
+              {lockedReels[i] && (
+                <div className="absolute inset-0 bg-yellow-400/20 flex items-center justify-center">
+                  <div className="absolute top-1 right-1">
+                    <Lock className="w-5 h-5 text-yellow-400" fill="currentColor" />
+                  </div>
+                </div>
+              )}
+              
+              {/* Hover hint when respin available */}
+              {showRespinUI && respinInfo?.eligible && !lockedReels[i] && !isProcessing && (
+                <div className="absolute inset-0 bg-purple-400/0 hover:bg-purple-400/10 transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
+                  <span className="text-xs text-purple-300 bg-black/80 px-2 py-1 rounded">LOCK</span>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -172,8 +231,8 @@ export function SlotsPage() {
         </div>
         
         {/* Result display */}
-        <div className="h-20 flex items-center justify-center mb-4">
-          {lastResult && lastResult.winType !== WinType.NONE ? (
+        <div className="min-h-[80px] flex flex-col items-center justify-center mb-4">
+          {lastResult && lastResult.winType !== WinType.NONE && !showRespinUI ? (
             <div className="text-center animate-bounce">
               <div className="text-2xl font-bold text-green-400">
                 🎉 {getWinTypeDisplay(lastResult.winType)} 🎉
@@ -183,7 +242,60 @@ export function SlotsPage() {
           ) : isProcessing ? (
             <div className="text-center">
               <div className="text-xl text-purple-400 animate-pulse">
-                🎰 Spinning...
+                🎰 {isRespinning || isRespinConfirming ? 'Respinning...' : 'Spinning...'}
+              </div>
+            </div>
+          ) : lastResult && showRespinUI && respinInfo?.eligible ? (
+            <div className="text-center space-y-3 w-full max-w-md">
+              {lastResult.winType !== WinType.NONE && (
+                <div className="text-green-400 font-bold">
+                  +{Number(formatEther(lastResult.payout)).toLocaleString()} $HASH
+                </div>
+              )}
+              
+              {/* Respin UI */}
+              <div className="border border-yellow-500/50 bg-yellow-500/10 p-3 rounded">
+                <div className="text-sm text-yellow-400 mb-2 flex items-center justify-center gap-2">
+                  <RotateCcw className="w-4 h-4" />
+                  <span>Lock & Respin available!</span>
+                </div>
+                <p className="text-xs text-gray-400 mb-3">
+                  Click reels to lock them, then respin the rest
+                </p>
+                
+                {lockCount > 0 && (
+                  <div className="mb-3">
+                    <div className="text-xs text-gray-400">
+                      {lockCount} reel{lockCount > 1 ? 's' : ''} locked • Cost: <span className="text-yellow-400 font-bold">{Number(formatEther(respinCost || 0n)).toLocaleString()} $HASH</span>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex gap-2 justify-center">
+                  <button
+                    onClick={handleRespin}
+                    disabled={!canRespin || isProcessing}
+                    className={`
+                      px-6 py-2 font-bold border-2 transition-all flex items-center gap-2
+                      ${canRespin && !isProcessing
+                        ? 'bg-yellow-500 text-black border-yellow-400 hover:bg-yellow-400'
+                        : 'bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed'
+                      }
+                    `}
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    RESPIN
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowRespinUI(false)
+                      setLockedReels([false, false, false])
+                    }}
+                    className="px-4 py-2 border border-gray-600 text-gray-400 hover:border-gray-500 hover:text-white transition-colors"
+                  >
+                    SKIP
+                  </button>
+                </div>
               </div>
             </div>
           ) : lastResult && lastResult.winType === WinType.NONE ? (

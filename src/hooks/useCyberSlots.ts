@@ -28,6 +28,15 @@ export interface SpinHistory {
   timestamp: bigint
 }
 
+export interface RespinInfo {
+  eligible: boolean
+  originalSpinId: bigint
+  originalResult: [number, number, number]
+  blocksRemaining: bigint
+  cost1Lock: bigint
+  cost2Lock: bigint
+}
+
 export function useCyberSlots() {
   const { address } = useAccount()
   const [lastResult, setLastResult] = useState<SpinResult | null>(null)
@@ -62,6 +71,20 @@ export function useCyberSlots() {
   const { writeContract: writeSpin, data: spinTxHash, isPending: isSpinning, reset: resetSpin } = useWriteContract()
   const { data: spinReceipt, isLoading: isSpinConfirming, isSuccess: spinConfirmed } = useWaitForTransactionReceipt({ hash: spinTxHash })
   
+  // Respin transaction
+  const { writeContract: writeRespin, data: respinTxHash, isPending: isRespinning, reset: resetRespin } = useWriteContract()
+  const { data: respinReceipt, isLoading: isRespinConfirming, isSuccess: respinConfirmed } = useWaitForTransactionReceipt({ hash: respinTxHash })
+  
+  // Check if player can respin
+  const { data: canRespinData, refetch: refetchCanRespin } = useReadContract({
+    address: CONTRACTS.cyberSlots,
+    abi: CyberSlotsABI,
+    functionName: 'canRespin',
+    args: address ? [address] : undefined,
+    chainId: TARGET_CHAIN.id,
+    query: { enabled: !!address }
+  })
+  
   // Parse spin result from transaction receipt
   useEffect(() => {
     if (spinReceipt && spinConfirmed) {
@@ -92,8 +115,43 @@ export function useCyberSlots() {
       refetchJackpot()
       refetchStats()
       refetchHistory()
+      refetchCanRespin()
     }
-  }, [spinReceipt, spinConfirmed, refetchJackpot, refetchStats, refetchHistory])
+  }, [spinReceipt, spinConfirmed, refetchJackpot, refetchStats, refetchHistory, refetchCanRespin])
+  
+  // Parse respin result from transaction receipt
+  useEffect(() => {
+    if (respinReceipt && respinConfirmed) {
+      // Find Respin or SpinCompleted event in logs
+      for (const log of respinReceipt.logs) {
+        try {
+          const decoded = decodeEventLog({
+            abi: CyberSlotsABI,
+            data: log.data,
+            topics: log.topics,
+          })
+          
+          if (decoded.eventName === 'Respin') {
+            const args = decoded.args as any
+            setLastResult({
+              spinId: args.newSpinId,
+              result: args.newResult as [number, number, number],
+              winType: Number(args.winType),
+              payout: args.payout,
+            })
+            break
+          }
+        } catch {
+          // Not our event, continue
+        }
+      }
+      
+      refetchJackpot()
+      refetchStats()
+      refetchHistory()
+      refetchCanRespin()
+    }
+  }, [respinReceipt, respinConfirmed, refetchJackpot, refetchStats, refetchHistory, refetchCanRespin])
   
   // Place spin
   const spin = useCallback((amount: bigint) => {
@@ -106,6 +164,28 @@ export function useCyberSlots() {
       chainId: TARGET_CHAIN.id,
     })
   }, [writeSpin])
+  
+  // Lock and respin
+  const lockAndRespin = useCallback((lockReel0: boolean, lockReel1: boolean, lockReel2: boolean) => {
+    setLastResult(null)
+    writeRespin({
+      address: CONTRACTS.cyberSlots,
+      abi: CyberSlotsABI,
+      functionName: 'lockAndRespin',
+      args: [lockReel0, lockReel1, lockReel2],
+      chainId: TARGET_CHAIN.id,
+    })
+  }, [writeRespin])
+  
+  // Parse canRespin data
+  const respinInfo: RespinInfo | null = canRespinData ? {
+    eligible: (canRespinData as any)[0],
+    originalSpinId: BigInt((canRespinData as any)[1]),
+    originalResult: (canRespinData as any)[2] as [number, number, number],
+    blocksRemaining: BigInt((canRespinData as any)[3]),
+    cost1Lock: BigInt((canRespinData as any)[4]),
+    cost2Lock: BigInt((canRespinData as any)[5]),
+  } : null
   
   // Parse stats
   const gameStats = stats ? {
@@ -132,18 +212,24 @@ export function useCyberSlots() {
     lastResult,
     gameStats,
     spinHistory,
+    respinInfo,
     
     // Actions
     spin,
+    lockAndRespin,
     clearResult: () => setLastResult(null),
     resetSpin,
+    resetRespin,
     
     // Loading states
     isSpinning,
     isSpinConfirming,
+    isRespinning,
+    isRespinConfirming,
     
     // Refetch
     refetchJackpot,
     refetchStats,
+    refetchCanRespin,
   }
 }
