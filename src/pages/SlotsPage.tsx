@@ -4,6 +4,7 @@ import { parseEther, formatEther } from 'viem'
 import { useHashToken } from '../hooks/useHashToken'
 import { useCyberSlots, LINE_CELLS } from '../hooks/useCyberSlots'
 import { useHashStaking } from '../hooks/useHashStaking'
+import { GasErrorAlert } from '../components/GasErrorAlert'
 import { Zap, Volume2, VolumeX, Grid3X3, Trophy, Flame, Lock, RotateCcw } from 'lucide-react'
 
 // Cyber-themed symbols for 0-F hex
@@ -49,10 +50,13 @@ export function SlotsPage() {
     gameStats,
     spinHistory: onchainHistory,
     respinInfo,
+    gasError,
     spin,
     lockCellAndRespin,
     lockLineAndRespin,
     clearResult,
+    clearGasError,
+    retryWithMoreGas,
     isSpinning,
     isSpinConfirming,
     isRespinning,
@@ -139,6 +143,13 @@ export function SlotsPage() {
     }
   }, [lastResult, refetchBalance, refetchJackpot, refetchCanRespin, findMatchingCells, findWinningLines])
   
+  // Stop animation on gas error
+  useEffect(() => {
+    if (gasError) {
+      setSpinInitiated(false)
+    }
+  }, [gasError])
+  
   const handleSpin = useCallback(() => {
     if (spinInitiated || isSpinning || isSpinConfirming) return
     const amount = parseEther(betAmount || '0')
@@ -203,6 +214,15 @@ export function SlotsPage() {
 
   return (
     <main className="max-w-6xl mx-auto mt-4 px-4">
+      {/* Gas Error Modal */}
+      {gasError && (
+        <GasErrorAlert 
+          error={gasError} 
+          onRetry={retryWithMoreGas} 
+          onDismiss={clearGasError} 
+        />
+      )}
+      
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
