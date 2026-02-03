@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Terminal, Crosshair, Zap, Shield, Trophy, Users, Activity, Lock, DollarSign, Eye, Gift } from 'lucide-react'
+import { Terminal, Crosshair, Grid3X3, Shield, Trophy, Users, Activity, Lock, DollarSign, Eye, Gift } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { formatEther } from 'viem'
 import { useGlobalStats } from '../hooks/useGlobalStats'
@@ -70,7 +70,7 @@ export function HomePage() {
       id: 'SLOTS',
       path: '/slots',
       name: 'CYBER_SLOTS',
-      icon: <Zap size={28} />,
+      icon: <Grid3X3 size={28} />,
       desc: 'HIGH VOLATILITY. NEON CRASH.',
       accent: 'text-purple-400',
       border: 'group-hover:border-purple-400/50',
