@@ -364,7 +364,7 @@ export function SlotsPage() {
             </div>
             
             {/* Bet controls */}
-            {isConnected && !showRespinUI && (
+            {isConnected && (!showRespinUI || !respinInfo?.eligible) && (
               <div className="space-y-4">
                 <div className="flex justify-between text-xs text-gray-400">
                   <span>Balance: <span className="text-white">{Number(formatEther(balance)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span> $HASH</span>
