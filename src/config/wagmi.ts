@@ -2,13 +2,16 @@ import { http, createConfig, createStorage, cookieStorage } from 'wagmi'
 import { mainnet, sepolia } from 'wagmi/chains'
 import { injected } from 'wagmi/connectors'
 
-// Contract addresses - Sepolia Testnet (deployed 2025-02-01)
+// Contract addresses - Sepolia Testnet (deployed 2026-02-03)
+// V3 Architecture: JackpotVault (UUPS) + Game contracts
 export const CONTRACTS = {
   hashToken: '0xeF4796fb608AF39c9dB4FC1903ed1c880C4d9b8F' as `0x${string}`,
   hashStaking: '0x0d2B19D4Eb51887cb22a1B69e5FD903ff3c602Fb' as `0x${string}`,
+  jackpotVault: '0xD0A14446a07928520158A3CE376Cf1Bef0B89eD1' as `0x${string}`,
+  hashGame: '0xdEC5E4095b57219c1dCb9dD44083D769b4c0B690' as `0x${string}`,
+  cyberSlots: '0x8995265483dE91988258c673b01fCB1dE46700B4' as `0x${string}`,
+  // Legacy (deprecated)
   hashJackpot: '0x4760Ad151103428c4bBfdc710EDc859e85703899' as `0x${string}`,
-  hashGame: '0xDDCE0B582F2711a18A62Ce06569C5ea2d7375445' as `0x${string}`,
-  cyberSlots: '0xe07bb5a3d390c05f76fb75f3fa78de995de6f4f6' as `0x${string}`,
 }
 
 // Target chain for the app
