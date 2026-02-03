@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAccount } from 'wagmi'
 import { parseEther, formatEther } from 'viem'
 import { useHashToken } from '../hooks/useHashToken'
@@ -54,6 +54,12 @@ export function SlotsPage() {
   const [spinInitiated, setSpinInitiated] = useState(false)
   const [lockedReels, setLockedReels] = useState<[boolean, boolean, boolean]>([false, false, false])
   const [showRespinUI, setShowRespinUI] = useState(false)
+  const lockedReelsRef = useRef<[boolean, boolean, boolean]>([false, false, false])
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    lockedReelsRef.current = lockedReels
+  }, [lockedReels])
   
   // Calculate limits
   const minBet = parseEther('5')
@@ -74,15 +80,16 @@ export function SlotsPage() {
   useEffect(() => {
     if (spinInitiated) {
       const interval = setInterval(() => {
+        const locks = lockedReelsRef.current
         setDisplayReels(prev => [
-          lockedReels[0] ? prev[0] : Math.floor(Math.random() * 16),
-          lockedReels[1] ? prev[1] : Math.floor(Math.random() * 16),
-          lockedReels[2] ? prev[2] : Math.floor(Math.random() * 16),
+          locks[0] ? prev[0] : Math.floor(Math.random() * 16),
+          locks[1] ? prev[1] : Math.floor(Math.random() * 16),
+          locks[2] ? prev[2] : Math.floor(Math.random() * 16),
         ])
       }, 50)
       return () => clearInterval(interval)
     }
-  }, [spinInitiated, lockedReels])
+  }, [spinInitiated])
   
   // Update display when result arrives
   useEffect(() => {
