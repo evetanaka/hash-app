@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAccount } from 'wagmi'
 import { parseEther, formatEther } from 'viem'
 import { useHashToken } from '../hooks/useHashToken'
@@ -54,12 +54,8 @@ export function SlotsPage() {
   const [spinInitiated, setSpinInitiated] = useState(false)
   const [lockedReels, setLockedReels] = useState<[boolean, boolean, boolean]>([false, false, false])
   const [showRespinUI, setShowRespinUI] = useState(false)
-  const lockedReelsRef = useRef<[boolean, boolean, boolean]>([false, false, false])
-  
-  // Keep ref in sync with state
-  useEffect(() => {
-    lockedReelsRef.current = lockedReels
-  }, [lockedReels])
+  // Locks that are active during animation (captured when respin starts)
+  const [animationLocks, setAnimationLocks] = useState<[boolean, boolean, boolean]>([false, false, false])
   
   // Calculate limits
   const minBet = parseEther('5')
@@ -79,8 +75,8 @@ export function SlotsPage() {
   // Locked reels stay fixed, only unlocked ones animate
   useEffect(() => {
     if (spinInitiated) {
+      const locks = animationLocks // Capture current locks
       const interval = setInterval(() => {
-        const locks = lockedReelsRef.current
         setDisplayReels(prev => [
           locks[0] ? prev[0] : Math.floor(Math.random() * 16),
           locks[1] ? prev[1] : Math.floor(Math.random() * 16),
@@ -89,7 +85,7 @@ export function SlotsPage() {
       }, 50)
       return () => clearInterval(interval)
     }
-  }, [spinInitiated])
+  }, [spinInitiated, animationLocks])
   
   // Update display when result arrives
   useEffect(() => {
@@ -118,9 +114,10 @@ export function SlotsPage() {
     const amount = parseEther(betAmount || '0')
     if (amount < minBet || amount > maxBet || amount > balance) return
     
-    setSpinInitiated(true) // Start animation immediately
+    setAnimationLocks([false, false, false]) // No locks for normal spin
     setLockedReels([false, false, false])
     setShowRespinUI(false)
+    setSpinInitiated(true) // Start animation
     clearResult()
     spin(amount)
   }, [betAmount, balance, minBet, maxBet, spinInitiated, isSpinning, isSpinConfirming, clearResult, spin])
@@ -131,6 +128,7 @@ export function SlotsPage() {
     const lockCount = lockedReels.filter(Boolean).length
     if (lockCount === 0 || lockCount === 3) return
     
+    setAnimationLocks([...lockedReels]) // Capture locks for animation
     setSpinInitiated(true)
     lockAndRespin(lockedReels[0], lockedReels[1], lockedReels[2])
   }, [lockedReels, isRespinning, isRespinConfirming, lockAndRespin])
