@@ -2,21 +2,14 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAccount } from 'wagmi'
 import { parseEther, formatEther } from 'viem'
 import { useHashToken } from '../hooks/useHashToken'
-import { useCyberSlots } from '../hooks/useCyberSlots'
+import { useCyberSlots, LINE_CELLS } from '../hooks/useCyberSlots'
 import { useHashStaking } from '../hooks/useHashStaking'
-import { Zap, Volume2, VolumeX, Grid3X3, Trophy, Flame } from 'lucide-react'
+import { Zap, Volume2, VolumeX, Grid3X3, Trophy, Flame, Lock, RotateCcw } from 'lucide-react'
 
 // Cyber-themed symbols for 0-F hex
 const SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '🔔', '💎', '⭐', '7️⃣', '💀', '👑', '🚀', '⚡', '🎰', '💜', '🔮', '☠️']
-// Symbol colors (for future use)
-// const SYMBOL_COLORS = [
-//   'text-red-400', 'text-yellow-400', 'text-orange-400', 'text-purple-400',
-//   'text-yellow-500', 'text-cyan-400', 'text-yellow-300', 'text-red-500',
-//   'text-gray-400', 'text-yellow-400', 'text-blue-400', 'text-yellow-300',
-//   'text-purple-500', 'text-purple-400', 'text-violet-400', 'text-red-600'
-// ]
 
-// Payout info for display (BPS: 10000 = 1x)
+// Payout info for display
 const PAYOUTS_DISPLAY = [
   { match: '3 Match', payout: '15%', probability: '~25%', color: 'text-gray-400' },
   { match: '4 Match', payout: '80%', probability: '~5%', color: 'text-blue-400' },
@@ -28,19 +21,16 @@ const PAYOUTS_DISPLAY = [
   { match: '9x ☠️', payout: 'JACKPOT', probability: '~1/687B', color: 'text-yellow-500' },
 ]
 
-// 8 winning lines (indices in 3x3 grid)
+// 8 winning lines (for highlighting)
 const WINNING_LINES = [
-  [0, 1, 2], // Top row
-  [3, 4, 5], // Middle row
-  [6, 7, 8], // Bottom row
-  [0, 3, 6], // Left column
-  [1, 4, 7], // Center column
-  [2, 5, 8], // Right column
-  [0, 4, 8], // Diagonal \
-  [2, 4, 6], // Diagonal /
+  [0, 1, 2], [3, 4, 5], [6, 7, 8],
+  [0, 3, 6], [1, 4, 7], [2, 5, 8],
+  [0, 4, 8], [2, 4, 6],
 ]
 
-// Tier max bets
+// Line names for UI
+const LINE_NAMES = ['Top Row', 'Middle Row', 'Bottom Row', 'Left Col', 'Center Col', 'Right Col']
+
 const TIER_MAX_BETS: Record<number, bigint> = {
   0: parseEther('100'),
   1: parseEther('500'),
@@ -58,11 +48,17 @@ export function SlotsPage() {
     lastResult,
     gameStats,
     spinHistory: onchainHistory,
+    respinInfo,
     spin,
+    lockCellAndRespin,
+    lockLineAndRespin,
     clearResult,
     isSpinning,
     isSpinConfirming,
+    isRespinning,
+    isRespinConfirming,
     refetchJackpot,
+    refetchCanRespin,
   } = useCyberSlots()
   
   const [betAmount, setBetAmount] = useState('100')
@@ -71,19 +67,17 @@ export function SlotsPage() {
   const [spinInitiated, setSpinInitiated] = useState(false)
   const [winningCells, setWinningCells] = useState<number[]>([])
   const [winningLines, setWinningLines] = useState<number[][]>([])
+  const [showRespinUI, setShowRespinUI] = useState(false)
+  const [selectedCell, setSelectedCell] = useState<number | null>(null)
+  const [selectedLine, setSelectedLine] = useState<number | null>(null)
   
-  // Calculate limits
   const minBet = parseEther('5')
   const maxBet = TIER_MAX_BETS[tierInfo?.tier ?? 0] || parseEther('100')
   
-  // Refetch allowance when approve confirmed
   useEffect(() => {
-    if (isApproveConfirmed) {
-      refetchSlotsAllowance()
-    }
+    if (isApproveConfirmed) refetchSlotsAllowance()
   }, [isApproveConfirmed, refetchSlotsAllowance])
   
-  // Check if approved
   const needsApproval = slotsAllowance < parseEther(betAmount || '0')
   
   // Animation while spinning
@@ -91,6 +85,7 @@ export function SlotsPage() {
     if (spinInitiated) {
       setWinningCells([])
       setWinningLines([])
+      setShowRespinUI(false)
       const interval = setInterval(() => {
         setDisplayGrid(Array(9).fill(0).map(() => Math.floor(Math.random() * 16)))
       }, 80)
@@ -98,15 +93,13 @@ export function SlotsPage() {
     }
   }, [spinInitiated])
   
-  // Find matching cells for highlighting
+  // Find matching cells
   const findMatchingCells = useCallback((grid: number[]) => {
     const counts: Record<number, number[]> = {}
     grid.forEach((symbol, idx) => {
       if (!counts[symbol]) counts[symbol] = []
       counts[symbol].push(idx)
     })
-    
-    // Find the symbol with most matches (3+)
     let maxIndices: number[] = []
     Object.values(counts).forEach(indices => {
       if (indices.length >= 3 && indices.length > maxIndices.length) {
@@ -132,36 +125,61 @@ export function SlotsPage() {
     if (lastResult) {
       setSpinInitiated(false)
       setDisplayGrid(lastResult.grid)
-      
-      // Highlight matching cells
-      const matching = findMatchingCells(lastResult.grid)
-      setWinningCells(matching)
-      
-      // Highlight winning lines
-      const lines = findWinningLines(lastResult.grid)
-      setWinningLines(lines)
-      
+      setWinningCells(findMatchingCells(lastResult.grid))
+      setWinningLines(findWinningLines(lastResult.grid))
       refetchBalance()
       refetchJackpot()
+      refetchCanRespin()
+      // Show respin UI after delay
+      setTimeout(() => setShowRespinUI(true), 800)
     }
-  }, [lastResult, refetchBalance, refetchJackpot, findMatchingCells, findWinningLines])
+  }, [lastResult, refetchBalance, refetchJackpot, refetchCanRespin, findMatchingCells, findWinningLines])
   
   const handleSpin = useCallback(() => {
     if (spinInitiated || isSpinning || isSpinConfirming) return
-    
     const amount = parseEther(betAmount || '0')
     if (amount < minBet || amount > maxBet || amount > balance) return
     
     setSpinInitiated(true)
+    setSelectedCell(null)
+    setSelectedLine(null)
     clearResult()
     spin(amount)
   }, [betAmount, balance, minBet, maxBet, spinInitiated, isSpinning, isSpinConfirming, clearResult, spin])
   
-  const isProcessing = spinInitiated || isSpinning || isSpinConfirming
+  const handleCellLock = (cellIndex: number) => {
+    if (!showRespinUI || !respinInfo?.eligible) return
+    setSelectedCell(selectedCell === cellIndex ? null : cellIndex)
+    setSelectedLine(null)
+  }
+  
+  const handleLineLock = (lineIndex: number) => {
+    if (!showRespinUI || !respinInfo?.eligible) return
+    setSelectedLine(selectedLine === lineIndex ? null : lineIndex)
+    setSelectedCell(null)
+  }
+  
+  const handleRespin = () => {
+    if (selectedCell !== null) {
+      setSpinInitiated(true)
+      lockCellAndRespin(selectedCell)
+    } else if (selectedLine !== null) {
+      setSpinInitiated(true)
+      lockLineAndRespin(selectedLine)
+    }
+  }
+  
+  const isProcessing = spinInitiated || isSpinning || isSpinConfirming || isRespinning || isRespinConfirming
   const betAmountBigInt = parseEther(betAmount || '0')
   const canSpin = betAmountBigInt >= minBet && betAmountBigInt <= maxBet && betAmountBigInt <= balance && !isProcessing && !needsApproval
+  
+  const respinCost = selectedCell !== null ? respinInfo?.cellCost : selectedLine !== null ? respinInfo?.lineCost : 0n
+  const canRespin = respinInfo?.eligible && (selectedCell !== null || selectedLine !== null) && (respinCost || 0n) <= balance
 
-  // Get win description
+  // Get selected line cells
+  const selectedLineCells = selectedLine !== null ? LINE_CELLS[selectedLine] : []
+
+  // Win description
   const getWinDescription = () => {
     if (!lastResult) return null
     if (lastResult.isJackpot) return { text: '🎉 JACKPOT!!! 🎉', color: 'text-yellow-400' }
@@ -170,11 +188,10 @@ export function SlotsPage() {
     if (lastResult.maxMatch >= 6) return { text: '⭐ 6 MATCH! 15x ⭐', color: 'text-yellow-400' }
     if (lastResult.maxMatch >= 5) return { text: '🚀 5 MATCH! 3x 🚀', color: 'text-green-400' }
     if (lastResult.maxMatch >= 4) return { text: '✨ 4 MATCH! 80% ✨', color: 'text-blue-400' }
-    if (lastResult.linesHit > 0) return { text: `📐 ${lastResult.linesHit} LINE${lastResult.linesHit > 1 ? 'S' : ''}! 1.5x each`, color: 'text-purple-400' }
+    if (lastResult.linesHit > 0) return { text: `📐 ${lastResult.linesHit} LINE${lastResult.linesHit > 1 ? 'S' : ''}!`, color: 'text-purple-400' }
     if (lastResult.maxMatch >= 3) return { text: '👍 3 MATCH! 15%', color: 'text-gray-400' }
     return null
   }
-
   const winInfo = getWinDescription()
 
   return (
@@ -183,9 +200,9 @@ export function SlotsPage() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-purple-400 flex items-center gap-2">
-            <Grid3X3 className="text-purple-400" /> CYBER_SLOTS V4
+            <Grid3X3 className="text-purple-400" /> CYBER_SLOTS V5
           </h1>
-          <p className="text-gray-500 text-sm">3x3 GRID • PROGRESSIVE PAYOUTS • INSTANT RESULTS</p>
+          <p className="text-gray-500 text-sm">3x3 GRID • LOCK & RESPIN • PROGRESSIVE PAYOUTS</p>
         </div>
         <button 
           onClick={() => setSoundEnabled(!soundEnabled)}
@@ -218,43 +235,128 @@ export function SlotsPage() {
               {displayGrid.map((symbol, i) => {
                 const isWinning = winningCells.includes(i)
                 const isInLine = winningLines.some(line => line.includes(i))
+                const isCellSelected = selectedCell === i
+                const isLineSelected = selectedLineCells.includes(i)
+                const isLocked = isCellSelected || isLineSelected
                 
                 return (
                   <div 
                     key={i}
+                    onClick={() => showRespinUI && respinInfo?.eligible && handleCellLock(i)}
                     className={`
-                      aspect-square flex items-center justify-center text-4xl md:text-5xl
+                      aspect-square flex items-center justify-center text-4xl md:text-5xl relative
                       bg-gray-900 border-2 transition-all duration-200
-                      ${isProcessing ? 'animate-pulse border-purple-400' : ''}
-                      ${isWinning ? 'border-green-400 shadow-[0_0_20px_rgba(74,222,128,0.5)] bg-green-900/20' : ''}
-                      ${isInLine && !isWinning ? 'border-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.4)]' : ''}
-                      ${!isWinning && !isInLine ? 'border-purple-400/30' : ''}
+                      ${isProcessing && !isLocked ? 'animate-pulse border-purple-400' : ''}
+                      ${isWinning && !showRespinUI ? 'border-green-400 shadow-[0_0_20px_rgba(74,222,128,0.5)] bg-green-900/20' : ''}
+                      ${isInLine && !isWinning && !showRespinUI ? 'border-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.4)]' : ''}
+                      ${isLocked ? 'border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.4)] bg-yellow-900/20' : ''}
+                      ${!isWinning && !isInLine && !isLocked ? 'border-purple-400/30' : ''}
+                      ${showRespinUI && respinInfo?.eligible && !isLocked ? 'cursor-pointer hover:border-yellow-400/50 hover:scale-105' : ''}
                     `}
                   >
-                    <span className={isWinning ? 'animate-bounce' : ''}>
+                    <span className={isWinning && !showRespinUI ? 'animate-bounce' : ''}>
                       {SYMBOLS[symbol]}
                     </span>
+                    {isLocked && (
+                      <div className="absolute top-1 right-1">
+                        <Lock size={14} className="text-yellow-400" fill="currentColor" />
+                      </div>
+                    )}
                   </div>
                 )
               })}
             </div>
             
-            {/* Result display */}
-            <div className="min-h-[60px] flex flex-col items-center justify-center mb-4">
-              {lastResult && winInfo ? (
+            {/* Result / Respin UI */}
+            <div className="min-h-[100px] flex flex-col items-center justify-center mb-4">
+              {lastResult && winInfo && !showRespinUI ? (
                 <div className="text-center">
-                  <div className={`text-xl font-bold ${winInfo.color}`}>
-                    {winInfo.text}
-                  </div>
+                  <div className={`text-xl font-bold ${winInfo.color}`}>{winInfo.text}</div>
                   {lastResult.payout > 0n && (
-                    <div className="text-lg text-white">
-                      +{Number(formatEther(lastResult.payout)).toLocaleString()} $HASH
-                    </div>
+                    <div className="text-lg text-white">+{Number(formatEther(lastResult.payout)).toLocaleString()} $HASH</div>
                   )}
                 </div>
               ) : isProcessing ? (
                 <div className="text-xl text-purple-400 animate-pulse flex items-center gap-2">
-                  <Zap className="animate-spin" size={20} /> Spinning...
+                  <Zap className="animate-spin" size={20} /> {isRespinning || isRespinConfirming ? 'Respinning...' : 'Spinning...'}
+                </div>
+              ) : showRespinUI && respinInfo?.eligible ? (
+                <div className="w-full max-w-md space-y-3">
+                  {lastResult && winInfo && (
+                    <div className={`text-center font-bold ${winInfo.color}`}>
+                      {winInfo.text} {lastResult.payout > 0n && `+${Number(formatEther(lastResult.payout)).toLocaleString()}`}
+                    </div>
+                  )}
+                  
+                  <div className="border border-yellow-500/50 bg-yellow-500/10 p-4 rounded">
+                    <div className="text-sm text-yellow-400 mb-3 flex items-center justify-center gap-2">
+                      <RotateCcw size={16} /> Lock & Respin
+                    </div>
+                    
+                    {/* Lock options */}
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <div className="space-y-1">
+                        <div className="text-xs text-gray-400">Lock 1 Cell (50%)</div>
+                        <div className="text-xs text-yellow-400">Click any cell above</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-xs text-gray-400">Lock 1 Line (100%)</div>
+                        <div className="flex flex-wrap gap-1">
+                          {[0, 1, 2, 3, 4, 5].map(i => (
+                            <button
+                              key={i}
+                              onClick={() => handleLineLock(i)}
+                              className={`text-[10px] px-1.5 py-0.5 border transition-colors ${
+                                selectedLine === i 
+                                  ? 'border-yellow-400 bg-yellow-400/20 text-yellow-400' 
+                                  : 'border-gray-600 text-gray-400 hover:border-yellow-400/50'
+                              }`}
+                            >
+                              {LINE_NAMES[i]}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Selection info */}
+                    {(selectedCell !== null || selectedLine !== null) && (
+                      <div className="text-center mb-3 text-sm">
+                        <span className="text-yellow-400">
+                          {selectedCell !== null ? `Cell ${selectedCell} locked` : `${LINE_NAMES[selectedLine!]} locked`}
+                        </span>
+                        <span className="text-gray-400"> • Cost: </span>
+                        <span className="text-yellow-400 font-bold">
+                          {Number(formatEther(respinCost || 0n)).toLocaleString()} $HASH
+                        </span>
+                      </div>
+                    )}
+                    
+                    {/* Action buttons */}
+                    <div className="flex gap-2 justify-center">
+                      <button
+                        onClick={handleRespin}
+                        disabled={!canRespin || isProcessing}
+                        className={`px-6 py-2 font-bold border-2 transition-all flex items-center gap-2 ${
+                          canRespin && !isProcessing
+                            ? 'bg-yellow-500 text-black border-yellow-400 hover:bg-yellow-400'
+                            : 'bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed'
+                        }`}
+                      >
+                        <RotateCcw size={16} /> RESPIN
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowRespinUI(false)
+                          setSelectedCell(null)
+                          setSelectedLine(null)
+                        }}
+                        className="px-4 py-2 border border-gray-600 text-gray-400 hover:border-gray-500 hover:text-white"
+                      >
+                        SKIP
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ) : lastResult && lastResult.payout === 0n ? (
                 <div className="text-gray-500">No win. Try again!</div>
@@ -262,14 +364,13 @@ export function SlotsPage() {
             </div>
             
             {/* Bet controls */}
-            {isConnected && (
+            {isConnected && !showRespinUI && (
               <div className="space-y-4">
                 <div className="flex justify-between text-xs text-gray-400">
                   <span>Balance: <span className="text-white">{Number(formatEther(balance)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span> $HASH</span>
                   <span>Tier: <span className="text-purple-400">{tierName || 'NONE'}</span></span>
                 </div>
                 
-                {/* Approval check */}
                 {needsApproval && balance > 0n && (
                   <div className="border border-yellow-500/50 bg-yellow-500/10 p-3 text-center">
                     <div className="text-sm text-yellow-400 mb-2">Approve $HASH for CyberSlots</div>
@@ -301,19 +402,16 @@ export function SlotsPage() {
                   <button 
                     onClick={handleSpin}
                     disabled={!canSpin}
-                    className={`
-                      w-36 py-3 font-bold border-2 transition-all duration-100 uppercase tracking-wider
-                      ${!canSpin
+                    className={`w-36 py-3 font-bold border-2 transition-all uppercase tracking-wider ${
+                      !canSpin
                         ? 'bg-gray-900 text-gray-600 border-gray-800 cursor-not-allowed' 
                         : 'bg-purple-600 text-white border-purple-400 hover:bg-purple-500 hover:shadow-[0_0_20px_rgba(168,85,247,0.5)]'
-                      }
-                    `}
+                    }`}
                   >
                     {isProcessing ? 'SPINNING...' : 'SPIN'}
                   </button>
                 </div>
                 
-                {/* Quick bet buttons */}
                 <div className="flex gap-2">
                   {[5, 25, 50, 100, 500].map(amt => (
                     <button
@@ -326,10 +424,7 @@ export function SlotsPage() {
                     </button>
                   ))}
                   <button
-                    onClick={() => {
-                      const max = balance < maxBet ? balance : maxBet
-                      setBetAmount(formatEther(max))
-                    }}
+                    onClick={() => setBetAmount(formatEther(balance < maxBet ? balance : maxBet))}
                     disabled={isProcessing}
                     className="flex-1 py-1 text-xs border border-purple-700 text-purple-400 hover:border-purple-400 hover:text-white transition-colors"
                   >
@@ -354,13 +449,8 @@ export function SlotsPage() {
                         <span key={j} className="text-base">{SYMBOLS[s]}</span>
                       ))}
                     </div>
-                    <div className="text-right">
-                      <div className={spin.payout > 0n ? 'text-green-400 font-bold' : 'text-red-400'}>
-                        {spin.payout > 0n ? `+${Number(formatEther(spin.payout)).toLocaleString()}` : 'No win'}
-                      </div>
-                      {spin.maxMatch >= 3 && (
-                        <div className="text-gray-500">{spin.maxMatch} match{spin.linesHit > 0 ? ` + ${spin.linesHit} line` : ''}</div>
-                      )}
+                    <div className={spin.payout > 0n ? 'text-green-400 font-bold' : 'text-red-400'}>
+                      {spin.payout > 0n ? `+${Number(formatEther(spin.payout)).toLocaleString()}` : 'No win'}
                     </div>
                   </div>
                 ))
@@ -369,14 +459,34 @@ export function SlotsPage() {
           </div>
         </div>
         
-        {/* Sidebar - Payouts */}
+        {/* Sidebar */}
         <div className="space-y-4">
+          {/* Lock & Respin Info */}
+          <div className="bg-gradient-to-br from-yellow-900/30 to-orange-900/30 border border-yellow-500/50 p-4">
+            <h3 className="text-sm font-bold text-yellow-400 mb-3 uppercase flex items-center gap-2">
+              <Lock size={16} /> Lock & Respin
+            </h3>
+            <div className="text-xs text-gray-300 space-y-2">
+              <div className="flex justify-between">
+                <span>Lock 1 Cell</span>
+                <span className="text-yellow-400 font-bold">50% of bet</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Lock 1 Line (3 cells)</span>
+                <span className="text-yellow-400 font-bold">100% of bet</span>
+              </div>
+              <p className="text-gray-500 pt-2 border-t border-gray-700">
+                After spinning, lock your best symbols and respin the rest!
+              </p>
+            </div>
+          </div>
+          
           {/* Payout Table */}
           <div className="bg-black border border-purple-500/30 p-4">
             <h3 className="text-sm font-bold text-purple-400 mb-4 uppercase flex items-center gap-2">
               <Flame size={16} /> Payout Table
             </h3>
-            <div className="space-y-3">
+            <div className="space-y-2">
               {PAYOUTS_DISPLAY.map((p, i) => (
                 <div 
                   key={i} 
@@ -385,26 +495,12 @@ export function SlotsPage() {
                   }`}
                 >
                   <div>
-                    <div className={`font-bold ${p.color}`}>{p.match}</div>
+                    <div className={`font-bold text-sm ${p.color}`}>{p.match}</div>
                     <div className="text-[10px] text-gray-500">{p.probability}</div>
                   </div>
-                  <div className={`text-lg font-bold ${p.color}`}>
-                    {p.payout}
-                  </div>
+                  <div className={`text-lg font-bold ${p.color}`}>{p.payout}</div>
                 </div>
               ))}
-            </div>
-          </div>
-          
-          {/* How it works */}
-          <div className="bg-black border border-gray-800 p-4">
-            <h3 className="text-sm font-bold text-gray-400 mb-3 uppercase">How It Works</h3>
-            <div className="text-xs text-gray-500 space-y-2">
-              <p>• Grid uses last 9 hex digits of blockhash</p>
-              <p>• Match 3+ identical symbols anywhere to win</p>
-              <p>• 3 in a line (row/col/diagonal) = 1.5x bonus</p>
-              <p>• Higher matches = bigger multipliers</p>
-              <p>• 9x ☠️ (F) = Win the entire jackpot!</p>
             </div>
           </div>
           
@@ -413,7 +509,7 @@ export function SlotsPage() {
             <h3 className="text-sm font-bold text-gray-400 mb-3 uppercase">Global Stats</h3>
             <div className="grid grid-cols-2 gap-2 text-xs">
               {[
-                { label: 'Spins', val: gameStats ? gameStats.totalSpins.toString() : '—' },
+                { label: 'Spins', val: gameStats?.totalSpins?.toString() ?? '—' },
                 { label: 'Wagered', val: gameStats ? `${(Number(formatEther(gameStats.totalWagered)) / 1000).toFixed(0)}K` : '—' },
                 { label: 'Paid Out', val: gameStats ? `${(Number(formatEther(gameStats.totalPaidOut)) / 1000).toFixed(0)}K` : '—' },
                 { label: 'Burned', val: gameStats ? `${(Number(formatEther(gameStats.totalBurned)) / 1000).toFixed(0)}K` : '—' },
