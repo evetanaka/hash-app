@@ -70,6 +70,7 @@ export function SlotsPage() {
   const [showRespinUI, setShowRespinUI] = useState(false)
   const [selectedCell, setSelectedCell] = useState<number | null>(null)
   const [selectedLine, setSelectedLine] = useState<number | null>(null)
+  const [animationLocks, setAnimationLocks] = useState<number[]>([]) // Cells to keep fixed during animation
   
   const minBet = parseEther('5')
   const maxBet = TIER_MAX_BETS[tierInfo?.tier ?? 0] || parseEther('100')
@@ -86,12 +87,15 @@ export function SlotsPage() {
       setWinningCells([])
       setWinningLines([])
       setShowRespinUI(false)
+      const lockedCells = animationLocks
       const interval = setInterval(() => {
-        setDisplayGrid(Array(9).fill(0).map(() => Math.floor(Math.random() * 16)))
+        setDisplayGrid(prev => prev.map((val, i) => 
+          lockedCells.includes(i) ? val : Math.floor(Math.random() * 16)
+        ))
       }, 80)
       return () => clearInterval(interval)
     }
-  }, [spinInitiated])
+  }, [spinInitiated, animationLocks])
   
   // Find matching cells
   const findMatchingCells = useCallback((grid: number[]) => {
@@ -140,6 +144,7 @@ export function SlotsPage() {
     const amount = parseEther(betAmount || '0')
     if (amount < minBet || amount > maxBet || amount > balance) return
     
+    setAnimationLocks([]) // Clear locks for fresh spin
     setSpinInitiated(true)
     setSelectedCell(null)
     setSelectedLine(null)
@@ -161,9 +166,11 @@ export function SlotsPage() {
   
   const handleRespin = () => {
     if (selectedCell !== null) {
+      setAnimationLocks([selectedCell])
       setSpinInitiated(true)
       lockCellAndRespin(selectedCell)
     } else if (selectedLine !== null) {
+      setAnimationLocks(LINE_CELLS[selectedLine])
       setSpinInitiated(true)
       lockLineAndRespin(selectedLine)
     }
