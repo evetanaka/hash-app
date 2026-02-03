@@ -4,37 +4,34 @@ import { CONTRACTS, TARGET_CHAIN } from '../config/wagmi'
 import { CyberSlotsABI } from '../abi/CyberSlotsABI'
 import { decodeEventLog } from 'viem'
 
-export const WinType = {
-  NONE: 0,
-  TWO_OF_KIND: 1,
-  SEQUENTIAL: 2,
-  THREE_OF_KIND: 3,
-  JACKPOT: 4,
-} as const
-
 export interface SpinResult {
   spinId: bigint
-  result: [number, number, number]
-  winType: number
+  grid: number[]  // 9 elements
+  maxMatch: number
+  linesHit: number
+  isJackpot: boolean
   payout: bigint
 }
 
 export interface SpinHistory {
   player: string
   amount: bigint
-  result: [number, number, number]
-  winType: number
+  grid: number[]
+  maxMatch: number
+  linesHit: number
+  isJackpot: boolean
   payout: bigint
   timestamp: bigint
 }
 
-export interface RespinInfo {
-  eligible: boolean
-  originalSpinId: bigint
-  originalResult: [number, number, number]
-  blocksRemaining: bigint
-  cost1Lock: bigint
-  cost2Lock: bigint
+export interface PayoutConfig {
+  match3: bigint
+  match4: bigint
+  match5: bigint
+  match6: bigint
+  match7: bigint
+  match8: bigint
+  line3: bigint
 }
 
 export function useCyberSlots() {
@@ -45,7 +42,7 @@ export function useCyberSlots() {
   const { data: jackpotPool, refetch: refetchJackpot } = useReadContract({
     address: CONTRACTS.cyberSlots,
     abi: CyberSlotsABI,
-    functionName: 'jackpotPool',
+    functionName: 'getJackpotPool',
     chainId: TARGET_CHAIN.id,
   })
   
@@ -54,6 +51,14 @@ export function useCyberSlots() {
     address: CONTRACTS.cyberSlots,
     abi: CyberSlotsABI,
     functionName: 'getStats',
+    chainId: TARGET_CHAIN.id,
+  })
+  
+  // Read payout config
+  const { data: payoutsData } = useReadContract({
+    address: CONTRACTS.cyberSlots,
+    abi: CyberSlotsABI,
+    functionName: 'getPayouts',
     chainId: TARGET_CHAIN.id,
   })
   
@@ -71,20 +76,6 @@ export function useCyberSlots() {
   const { writeContract: writeSpin, data: spinTxHash, isPending: isSpinning, reset: resetSpin } = useWriteContract()
   const { data: spinReceipt, isLoading: isSpinConfirming, isSuccess: spinConfirmed } = useWaitForTransactionReceipt({ hash: spinTxHash })
   
-  // Respin transaction
-  const { writeContract: writeRespin, data: respinTxHash, isPending: isRespinning, reset: resetRespin } = useWriteContract()
-  const { data: respinReceipt, isLoading: isRespinConfirming, isSuccess: respinConfirmed } = useWaitForTransactionReceipt({ hash: respinTxHash })
-  
-  // Check if player can respin
-  const { data: canRespinData, refetch: refetchCanRespin } = useReadContract({
-    address: CONTRACTS.cyberSlots,
-    abi: CyberSlotsABI,
-    functionName: 'canRespin',
-    args: address ? [address] : undefined,
-    chainId: TARGET_CHAIN.id,
-    query: { enabled: !!address }
-  })
-  
   // Parse spin result from transaction receipt
   useEffect(() => {
     if (spinReceipt && spinConfirmed) {
@@ -101,8 +92,10 @@ export function useCyberSlots() {
             const args = decoded.args as any
             setLastResult({
               spinId: args.spinId,
-              result: args.result as [number, number, number],
-              winType: Number(args.winType),
+              grid: Array.from(args.grid).map(Number),
+              maxMatch: Number(args.maxMatch),
+              linesHit: Number(args.linesHit),
+              isJackpot: args.maxMatch === 9 && args.grid.every((s: number) => s === 15),
               payout: args.payout,
             })
             break
@@ -115,43 +108,8 @@ export function useCyberSlots() {
       refetchJackpot()
       refetchStats()
       refetchHistory()
-      refetchCanRespin()
     }
-  }, [spinReceipt, spinConfirmed, refetchJackpot, refetchStats, refetchHistory, refetchCanRespin])
-  
-  // Parse respin result from transaction receipt
-  useEffect(() => {
-    if (respinReceipt && respinConfirmed) {
-      // Find Respin or SpinCompleted event in logs
-      for (const log of respinReceipt.logs) {
-        try {
-          const decoded = decodeEventLog({
-            abi: CyberSlotsABI,
-            data: log.data,
-            topics: log.topics,
-          })
-          
-          if (decoded.eventName === 'Respin') {
-            const args = decoded.args as any
-            setLastResult({
-              spinId: args.newSpinId,
-              result: args.newResult as [number, number, number],
-              winType: Number(args.winType),
-              payout: args.payout,
-            })
-            break
-          }
-        } catch {
-          // Not our event, continue
-        }
-      }
-      
-      refetchJackpot()
-      refetchStats()
-      refetchHistory()
-      refetchCanRespin()
-    }
-  }, [respinReceipt, respinConfirmed, refetchJackpot, refetchStats, refetchHistory, refetchCanRespin])
+  }, [spinReceipt, spinConfirmed, refetchJackpot, refetchStats, refetchHistory])
   
   // Place spin
   const spin = useCallback((amount: bigint) => {
@@ -165,26 +123,15 @@ export function useCyberSlots() {
     })
   }, [writeSpin])
   
-  // Lock and respin
-  const lockAndRespin = useCallback((lockReel0: boolean, lockReel1: boolean, lockReel2: boolean) => {
-    setLastResult(null)
-    writeRespin({
-      address: CONTRACTS.cyberSlots,
-      abi: CyberSlotsABI,
-      functionName: 'lockAndRespin',
-      args: [lockReel0, lockReel1, lockReel2],
-      chainId: TARGET_CHAIN.id,
-    })
-  }, [writeRespin])
-  
-  // Parse canRespin data
-  const respinInfo: RespinInfo | null = canRespinData ? {
-    eligible: (canRespinData as any)[0],
-    originalSpinId: BigInt((canRespinData as any)[1]),
-    originalResult: (canRespinData as any)[2] as [number, number, number],
-    blocksRemaining: BigInt((canRespinData as any)[3]),
-    cost1Lock: BigInt((canRespinData as any)[4]),
-    cost2Lock: BigInt((canRespinData as any)[5]),
+  // Parse payout config
+  const payoutConfig: PayoutConfig | null = payoutsData ? {
+    match3: BigInt((payoutsData as any).match3),
+    match4: BigInt((payoutsData as any).match4),
+    match5: BigInt((payoutsData as any).match5),
+    match6: BigInt((payoutsData as any).match6),
+    match7: BigInt((payoutsData as any).match7),
+    match8: BigInt((payoutsData as any).match8),
+    line3: BigInt((payoutsData as any).line3),
   } : null
   
   // Parse stats
@@ -200,8 +147,10 @@ export function useCyberSlots() {
   const spinHistory: SpinHistory[] = spinHistoryData ? (spinHistoryData as any[]).map((s: any) => ({
     player: s.player,
     amount: BigInt(s.amount),
-    result: s.result as [number, number, number],
-    winType: Number(s.winType),
+    grid: Array.from(s.grid).map(Number),
+    maxMatch: Number(s.maxMatch),
+    linesHit: Number(s.linesHit),
+    isJackpot: s.isJackpot,
     payout: BigInt(s.payout),
     timestamp: BigInt(s.timestamp),
   })) : []
@@ -212,24 +161,19 @@ export function useCyberSlots() {
     lastResult,
     gameStats,
     spinHistory,
-    respinInfo,
+    payoutConfig,
     
     // Actions
     spin,
-    lockAndRespin,
     clearResult: () => setLastResult(null),
     resetSpin,
-    resetRespin,
     
     // Loading states
     isSpinning,
     isSpinConfirming,
-    isRespinning,
-    isRespinConfirming,
     
     // Refetch
     refetchJackpot,
     refetchStats,
-    refetchCanRespin,
   }
 }

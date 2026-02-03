@@ -9,7 +9,7 @@ export const CyberSlotsABI = [
   },
   {
     inputs: [],
-    name: "jackpotPool",
+    name: "getJackpotPool",
     outputs: [{ type: "uint256" }],
     stateMutability: "view",
     type: "function"
@@ -63,6 +63,27 @@ export const CyberSlotsABI = [
     type: "function"
   },
   {
+    inputs: [],
+    name: "getPayouts",
+    outputs: [
+      {
+        components: [
+          { name: "match3", type: "uint256" },
+          { name: "match4", type: "uint256" },
+          { name: "match5", type: "uint256" },
+          { name: "match6", type: "uint256" },
+          { name: "match7", type: "uint256" },
+          { name: "match8", type: "uint256" },
+          { name: "line3", type: "uint256" }
+        ],
+        name: "",
+        type: "tuple"
+      }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
     inputs: [
       { name: "player", type: "address" },
       { name: "limit", type: "uint256" },
@@ -74,8 +95,10 @@ export const CyberSlotsABI = [
         components: [
           { name: "player", type: "address" },
           { name: "amount", type: "uint256" },
-          { name: "result", type: "uint8[3]" },
-          { name: "winType", type: "uint8" },
+          { name: "grid", type: "uint8[9]" },
+          { name: "maxMatch", type: "uint8" },
+          { name: "linesHit", type: "uint8" },
+          { name: "isJackpot", type: "bool" },
           { name: "payout", type: "uint256" },
           { name: "timestamp", type: "uint256" }
         ],
@@ -86,48 +109,36 @@ export const CyberSlotsABI = [
     stateMutability: "view",
     type: "function"
   },
+  {
+    inputs: [{ name: "hash", type: "bytes32" }],
+    name: "previewGrid",
+    outputs: [{ type: "uint8[9]" }],
+    stateMutability: "pure",
+    type: "function"
+  },
+  {
+    inputs: [{ name: "grid", type: "uint8[9]" }],
+    name: "analyzeGrid",
+    outputs: [
+      { name: "maxMatch", type: "uint8" },
+      { name: "linesHit", type: "uint8" },
+      { name: "isJackpot", type: "bool" }
+    ],
+    stateMutability: "pure",
+    type: "function"
+  },
   // Write functions
   {
     inputs: [{ name: "amount", type: "uint256" }],
     name: "spin",
     outputs: [
       { name: "spinId", type: "uint256" },
-      { name: "result", type: "uint8[3]" },
-      { name: "winType", type: "uint8" },
+      { name: "grid", type: "uint8[9]" },
+      { name: "maxMatch", type: "uint8" },
+      { name: "linesHit", type: "uint8" },
       { name: "payout", type: "uint256" }
     ],
     stateMutability: "nonpayable",
-    type: "function"
-  },
-  {
-    inputs: [
-      { name: "lockReel0", type: "bool" },
-      { name: "lockReel1", type: "bool" },
-      { name: "lockReel2", type: "bool" }
-    ],
-    name: "lockAndRespin",
-    outputs: [
-      { name: "newSpinId", type: "uint256" },
-      { name: "newResult", type: "uint8[3]" },
-      { name: "winType", type: "uint8" },
-      { name: "payout", type: "uint256" }
-    ],
-    stateMutability: "nonpayable",
-    type: "function"
-  },
-  // View functions for respin
-  {
-    inputs: [{ name: "player", type: "address" }],
-    name: "canRespin",
-    outputs: [
-      { name: "eligible", type: "bool" },
-      { name: "originalSpinId", type: "uint256" },
-      { name: "originalResult", type: "uint8[3]" },
-      { name: "blocksRemaining", type: "uint256" },
-      { name: "cost1Lock", type: "uint256" },
-      { name: "cost2Lock", type: "uint256" }
-    ],
-    stateMutability: "view",
     type: "function"
   },
   // Events
@@ -137,8 +148,9 @@ export const CyberSlotsABI = [
       { indexed: true, name: "spinId", type: "uint256" },
       { indexed: true, name: "player", type: "address" },
       { indexed: false, name: "amount", type: "uint256" },
-      { indexed: false, name: "result", type: "uint8[3]" },
-      { indexed: false, name: "winType", type: "uint8" },
+      { indexed: false, name: "grid", type: "uint8[9]" },
+      { indexed: false, name: "maxMatch", type: "uint8" },
+      { indexed: false, name: "linesHit", type: "uint8" },
       { indexed: false, name: "payout", type: "uint256" }
     ],
     name: "SpinCompleted",
@@ -152,21 +164,6 @@ export const CyberSlotsABI = [
       { indexed: false, name: "amount", type: "uint256" }
     ],
     name: "JackpotWon",
-    type: "event"
-  },
-  {
-    anonymous: false,
-    inputs: [
-      { indexed: true, name: "originalSpinId", type: "uint256" },
-      { indexed: true, name: "newSpinId", type: "uint256" },
-      { indexed: true, name: "player", type: "address" },
-      { indexed: false, name: "lockMask", type: "uint8" },
-      { indexed: false, name: "extraCost", type: "uint256" },
-      { indexed: false, name: "newResult", type: "uint8[3]" },
-      { indexed: false, name: "winType", type: "uint8" },
-      { indexed: false, name: "payout", type: "uint256" }
-    ],
-    name: "Respin",
     type: "event"
   }
 ] as const
