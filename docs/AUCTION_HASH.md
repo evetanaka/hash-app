@@ -1,19 +1,62 @@
-# Auction Hash — Game Design Document
+# Auction Hash — Game Design Document v2
 
 ## Overview
 
-**Auction Hash** is a weekly auction game where the highest bidder wins, but with a twist: bids must stay within a reasonable range of each other. This creates a game theory dynamic where players must guess the "market consensus" rather than simply outbid everyone.
+**Auction Hash** is a weekly sealed-bid auction game where the highest bidder wins, but with a twist: bids must stay within a reasonable range of each other (Consensus Rule). Bids are hidden until the reveal, with only aggregate bucket data visible via a heatmap.
 
 ## Core Mechanics
 
 ### Cycle
 - **Duration:** 1 week (Monday 00:00 UTC → Sunday 20:00 UTC)
-- **Reveal:** Sunday 20:00 UTC (automated via Chainlink Automation)
+- **Bidding:** Monday 00:00 → Sunday 19:00 UTC (sealed bids)
+- **Reveal:** Sunday 20:00 UTC (all bids revealed simultaneously)
 
-### Bidding Rules
-- Players submit bids in ETH/USDC during the auction period
-- Multiple bids allowed per player (only highest counts)
-- Bids are visible to all participants (transparent auction)
+### Sealed Bid System
+
+**How it works:**
+1. Player submits bid amount (encrypted on-chain)
+2. Player's bucket is publicly recorded for the heatmap
+3. Exact amounts remain hidden until reveal
+4. At reveal time, all bids are decrypted and winner determined
+
+**Buckets (for heatmap):**
+```
+BUCKET_0: 0 - 500 HASH
+BUCKET_1: 500 - 1,000 HASH
+BUCKET_2: 1,000 - 2,000 HASH
+BUCKET_3: 2,000 - 5,000 HASH
+BUCKET_4: 5,000 - 10,000 HASH
+BUCKET_5: 10,000+ HASH
+```
+
+The bucket is automatically determined by the frontend based on bid amount.
+
+### Heatmap Visualization
+
+Players see aggregate distribution without exact amounts:
+
+```
+CONSENSUS HEATMAP (23 bids)
+
+[0-500]      ░░ (2)
+[500-1k]     ▓▓▓▓▓ (5)  
+[1k-2k]      ▓▓▓▓▓▓▓▓▓▓▓ (11)  ← HOT ZONE
+[2k-5k]      ▓▓▓▓ (4)
+[5k-10k]     ░ (1)
+[10k+]       (0)
+
+Your bid: [1k-2k] bucket
+```
+
+**What players know:**
+- Distribution of bids across buckets
+- Which bucket they're in
+- Total number of participants
+
+**What players DON'T know:**
+- Exact amounts of other bids
+- Their precise ranking
+- Whether they're at the top or bottom of their bucket
 
 ### Winner Determination — The Consensus Rule
 
@@ -23,17 +66,18 @@ Consensus Rule: gap between top bid and 2nd bid ≤ 30% of top bid value
 ```
 
 **Cascade Logic:**
-1. Check if top bid is valid (gap with 2nd ≤ 30%)
-2. If invalid → top bid is "invalidated", check 2nd vs 3rd
-3. Repeat until a valid winner is found
-4. If no valid winner (edge case) → jackpot rolls over
+1. At reveal, all bids are decrypted and sorted
+2. Check if top bid is valid (gap with 2nd ≤ 30%)
+3. If invalid → top bid is "invalidated", check 2nd vs 3rd
+4. Repeat until a valid winner is found
+5. If no valid winner (edge case) → jackpot rolls over
 
 **Example:**
 ```
-Bids: 100, 65, 60, 55
+Revealed bids: 2100, 1500, 1420, 1380, 1200
 
-Check 1: 100 vs 65 → gap = 35% ❌ (100 invalidated)
-Check 2: 65 vs 60 → gap = 7.7% ✅ (65 wins!)
+Check 1: 2100 vs 1500 → gap = 40% ❌ (2100 invalidated)
+Check 2: 1500 vs 1420 → gap = 5.6% ✅ (1500 wins!)
 ```
 
 ### Payout Structure
@@ -41,8 +85,8 @@ Check 2: 65 vs 60 → gap = 7.7% ✅ (65 wins!)
 | Status | Receives |
 |--------|----------|
 | Winner | 100% of jackpot |
-| Losers | 90% of their bid back |
-| Invalidated | 90% of their bid back |
+| Losers (valid bids) | 90% of their bid back |
+| Invalidated (overbid) | 90% of their bid back |
 
 **10% of all losing/invalidated bids → Next week's jackpot**
 
@@ -52,111 +96,174 @@ The jackpot grows from multiple sources:
 
 1. **10% of losing bids** from current auction
 2. **10% of invalidated bids** from current auction  
-3. **10% cross-feed** from other Hash games' jackpots (Hash Game, Crash Hash, etc.)
+3. **10% cross-feed** from other Hash games' jackpots
 
-This creates a self-sustaining ecosystem where activity anywhere feeds the Auction Hash jackpot.
+## Technical Architecture
 
-## Parameters (Adjustable)
+### Encryption Scheme
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `maxGapPercent` | 30 | Maximum allowed gap between top and 2nd bid |
-| `losersRefundPercent` | 90 | Percentage refunded to losers |
-| `revealDay` | 0 (Sunday) | Day of week for reveal |
-| `revealHour` | 20 | Hour (UTC) for reveal |
-| `minBid` | 0.01 ETH | Minimum bid amount |
+Using **commit-reveal with timelock** or **threshold encryption**:
 
-Parameters can be adjusted by admin/governance based on observed player behavior.
+**Option A: Commit-Reveal Simplified**
+```solidity
+// Bidding phase
+function placeBid(bytes32 commitment, uint8 bucket) external payable {
+    // commitment = keccak256(abi.encodePacked(amount, secret))
+    // bucket is public for heatmap
+    bids[msg.sender] = Bid(commitment, bucket, msg.value);
+    bucketCounts[bucket]++;
+}
 
-## Smart Contract Architecture
+// Reveal phase (user reveals their own bid)
+function revealBid(uint256 amount, bytes32 secret) external {
+    require(block.timestamp >= revealTime);
+    require(keccak256(abi.encodePacked(amount, secret)) == bids[msg.sender].commitment);
+    require(getBucket(amount) == bids[msg.sender].bucket); // Bucket must match
+    revealedBids[msg.sender] = amount;
+}
+```
+
+**Option B: Oracle-based Sealed Bid (simpler UX)**
+```solidity
+// Bids encrypted with oracle's public key
+function placeBid(bytes encryptedAmount, uint8 bucket) external payable {
+    bids[msg.sender] = SealedBid(encryptedAmount, bucket, msg.value);
+    bucketCounts[bucket]++;
+}
+
+// Oracle reveals all bids at once
+function revealAllBids(
+    address[] bidders,
+    uint256[] amounts,
+    bytes oracleSignature
+) external onlyOracle {
+    // Verify and process all bids
+}
+```
+
+### Smart Contract Structure
 
 ```
-AuctionHash.sol
-├── bid(uint256 amount) — Place a bid
-├── reveal() — Trigger winner determination (Chainlink Automation)
+AuctionHashSealed.sol
+├── placeBid(commitment, bucket) — Place sealed bid
+├── revealBid(amount, secret) — Reveal your bid (Option A)
+├── finalizeAuction() — Determine winner after reveal
 ├── claimWinnings() — Winner claims jackpot
 ├── claimRefund() — Losers/invalidated claim 90%
 ├── feedJackpot() — Receive cross-feed from other games
 │
+├── View Functions:
+│   ├── getBucketCounts() — For heatmap display
+│   ├── getTotalBids() — Number of participants
+│   ├── getJackpot() — Current prize pool
+│   └── getTimeRemaining() — Until reveal
+│
 ├── State:
 │   ├── currentAuctionId
-│   ├── bids mapping (auctionId → address → amount)
+│   ├── bids mapping (address → SealedBid)
+│   ├── bucketCounts[6] — For heatmap
+│   ├── revealedBids mapping
 │   ├── jackpot
-│   ├── parameters (adjustable)
-│   └── auctionHistory
+│   └── parameters (adjustable)
 │
 └── Events:
-    ├── BidPlaced(auctionId, bidder, amount)
+    ├── BidPlaced(auctionId, bidder, bucket) // NO amount!
+    ├── BidRevealed(auctionId, bidder, amount)
     ├── BidInvalidated(auctionId, bidder, amount, gap)
     ├── WinnerDetermined(auctionId, winner, amount, jackpot)
     └── JackpotFed(source, amount)
 ```
 
+## Parameters (Adjustable)
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `maxGapPercent` | 30 | Maximum allowed gap between #1 and #2 bid |
+| `losersRefundPercent` | 90 | Percentage refunded to losers |
+| `minBid` | 100 HASH | Minimum bid amount |
+| `biddingDuration` | 6 days 19h | Time for placing bids |
+| `revealDuration` | 5 hours | Time window for reveals (Option A) |
+| `revealDay` | 0 (Sunday) | Day of week for reveal |
+| `revealHour` | 20 | Hour (UTC) for reveal |
+
 ## Frontend Features
 
 ### Main View
-- Current jackpot size (prominent)
-- Time remaining until reveal
-- Live bid list (sorted by amount)
-- "Danger zone" indicator showing if top bid would be invalidated
+- **Jackpot display** (prominent, animated)
+- **Countdown timer** to reveal
+- **Heatmap visualization** showing bucket distribution
+- **Bid input** with automatic bucket indicator
+- **Your position** shown as bucket (not exact rank)
 
 ### Bid Interface
-- Bid input with suggested range based on current bids
-- "Safe zone" calculator (what range keeps you valid)
-- Bid history for current auction
+```
+┌─────────────────────────────────────────┐
+│  YOUR BID                               │
+│  ┌─────────────────────────────────┐    │
+│  │ 1,500                    HASH   │    │
+│  └─────────────────────────────────┘    │
+│                                         │
+│  📊 You'll be in bucket [1k-2k]         │
+│  🔥 This is currently the HOT ZONE      │
+│                                         │
+│  ⚠️  Your exact amount stays hidden     │
+│      until Sunday 20:00 UTC             │
+│                                         │
+│  [████████ PLACE SEALED BID ████████]   │
+└─────────────────────────────────────────┘
+```
 
-### History
-- Past auction results
-- Winner, winning bid, invalidated bids
-- Jackpot growth chart over time
+### Heatmap Component
+```
+┌─────────────────────────────────────────┐
+│  CONSENSUS HEATMAP          23 bidders  │
+│                                         │
+│  [0-500]    ░░                     8%   │
+│  [500-1k]   ▓▓▓▓░                 22%   │
+│  [1k-2k]    ▓▓▓▓▓▓▓▓▓░      ←YOU 48%   │
+│  [2k-5k]    ▓▓▓░                  17%   │
+│  [5k+]      ░                      4%   │
+│                                         │
+│  💡 Most competition in 1k-2k range     │
+└─────────────────────────────────────────┘
+```
 
-### Strategy Helper
-- Current bid distribution visualization
-- "Consensus range" indicator
-- Warning if your bid would likely be invalidated
+### Post-Reveal View
+- Full bid list with amounts revealed
+- Cascade visualization (invalidated bids struck through)
+- Winner announcement
+- Claim buttons for winner/losers
 
 ## Game Theory Dynamics
 
-**What makes this interesting:**
+**Strategic considerations:**
 
-1. **No pure whale advantage** — Bidding too high gets you invalidated
-2. **Information game** — You're guessing what others will bid
-3. **Late bidding advantage** — More info, but less time to react
-4. **Psychological warfare** — Fake-out bids, bid sniping, etc.
+1. **Bucket positioning** — You see where competition clusters but not exact amounts
+2. **Risk/reward in bucket** — Bidding at top of bucket is safer but more expensive
+3. **Hot zone danger** — Popular buckets mean more competition within the bucket
+4. **Empty bucket opportunity** — Few bids in a bucket might mean easy win... or trap
+5. **Overbid risk** — Going to a higher bucket risks being >30% above
 
-**Optimal strategy evolves:** As players learn, the meta shifts. The adjustable `maxGapPercent` parameter lets us tune difficulty.
-
-## Integration with Hash Ecosystem
-
-```
-┌─────────────┐     10%      ┌──────────────┐
-│  Hash Game  │ ──────────→  │              │
-└─────────────┘              │              │
-                             │   AUCTION    │
-┌─────────────┐     10%      │    HASH      │
-│ Crash Hash  │ ──────────→  │   JACKPOT    │
-└─────────────┘              │              │
-                             │              │
-┌─────────────┐     10%      │              │
-│ Future Game │ ──────────→  │              │
-└─────────────┘              └──────────────┘
-```
+**The uncertainty creates real strategy:**
+- You might bid 1,900 thinking you're safe in [1k-2k]
+- But 5 others also bid 1,800-1,950
+- The winner is whoever threaded the needle
 
 ## Security Considerations
 
-- Reveal uses future block hash (same as Hash Game) — unpredictable
-- Chainlink Automation for trustless reveal timing
-- Reentrancy protection on all payout functions
-- Integer overflow checks (Solidity 0.8+)
+- Bids encrypted/committed → no front-running exact amounts
+- Bucket reveals aggregate only → maintains strategic uncertainty
+- Reveal phase → trustless verification of all bids
+- Chainlink Automation → trustless timing of reveal
+- If using oracle → multi-sig or threshold scheme
 
-## Launch Plan
+## Migration Path
 
-1. **Phase 1:** Deploy contract on testnet, internal testing
-2. **Phase 2:** Frontend development, UX testing
-3. **Phase 3:** Mainnet soft launch (low max bid)
-4. **Phase 4:** Full launch with cross-feed enabled
+1. **Phase 1:** Deploy with commit-reveal (users reveal own bids)
+2. **Phase 2:** Add oracle-based sealed bids (better UX)
+3. **Phase 3:** Threshold encryption (fully trustless)
 
 ---
 
-*Document version: 1.0*
+*Document version: 2.0 — Sealed Bid + Heatmap*
 *Last updated: 2026-02-04*

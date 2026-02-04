@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { CheckCircle, AlertTriangle } from 'lucide-react';
-import { useAccount } from 'wagmi';
-import { useConnect } from 'wagmi';
+import { CheckCircle, AlertTriangle, Lock, Eye } from 'lucide-react';
+import { useAccount, useConnect } from 'wagmi';
 import { injected } from 'wagmi/connectors';
 
 // --- UTILS ---
@@ -18,27 +17,37 @@ const useInterval = (callback: () => void, delay: number | null) => {
   }, [delay]);
 };
 
-interface Bid {
-  id: number | string;
-  bidder: string;
-  amount: number;
-  status: 'SAFE' | 'DANGER' | 'INVALID';
-  time: string;
-}
+// Bucket definitions
+const BUCKETS = [
+  { id: 0, label: '0-500', min: 0, max: 500 },
+  { id: 1, label: '500-1k', min: 500, max: 1000 },
+  { id: 2, label: '1k-2k', min: 1000, max: 2000 },
+  { id: 3, label: '2k-5k', min: 2000, max: 5000 },
+  { id: 4, label: '5k-10k', min: 5000, max: 10000 },
+  { id: 5, label: '10k+', min: 10000, max: Infinity },
+];
+
+const getBucketForAmount = (amount: number): number => {
+  for (let i = 0; i < BUCKETS.length; i++) {
+    if (amount >= BUCKETS[i].min && amount < BUCKETS[i].max) {
+      return i;
+    }
+  }
+  return BUCKETS.length - 1;
+};
 
 export const AuctionHash = () => {
   const { address, isConnected } = useAccount();
   const { connect } = useConnect();
+  
   const [jackpot, setJackpot] = useState(247832);
   const [userBid, setUserBid] = useState(1500);
   const [timeLeft, setTimeLeft] = useState({ d: 2, h: 14, m: 32, s: 18 });
-  const [bids, setBids] = useState<Bid[]>([
-    { id: 1, bidder: '0x7a3f...8e2d', amount: 2100, status: 'DANGER', time: '2m' },
-    { id: 2, bidder: '0x91bc...4f7a', amount: 1500, status: 'SAFE', time: '15m' },
-    { id: 3, bidder: '0x45de...9c1b', amount: 1420, status: 'SAFE', time: '1h' },
-    { id: 4, bidder: '0x22aa...bb11', amount: 1250, status: 'SAFE', time: '3h' },
-    { id: 5, bidder: '0x11cc...dd22', amount: 900, status: 'INVALID', time: '5h' },
-  ]);
+  const [hasPlacedBid, setHasPlacedBid] = useState(false);
+  
+  // Bucket counts for heatmap (mock data)
+  const [bucketCounts, setBucketCounts] = useState([2, 5, 11, 4, 1, 0]);
+  const totalBids = bucketCounts.reduce((a, b) => a + b, 0);
 
   useInterval(() => {
     // Tick Jackpot
@@ -63,21 +72,20 @@ export const AuctionHash = () => {
     });
   }, 1000);
 
-  const placeBid = () => {
-    if (!isConnected) return;
-    const truncatedAddress = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'YOU';
-    const newBid: Bid = {
-      id: Math.random(),
-      bidder: `YOU (${truncatedAddress})`,
-      amount: userBid,
-      status: userBid > 2000 ? 'DANGER' : 'SAFE',
-      time: 'Just now'
-    };
-    setBids(prev => [newBid, ...prev]);
-  };
+  const userBucket = getBucketForAmount(userBid);
+  const isValidBid = userBid >= 100;
+  
+  // Find the "hot zone" (bucket with most bids)
+  const hotZoneBucket = bucketCounts.indexOf(Math.max(...bucketCounts));
 
-  const isSafe = userBid >= 1200 && userBid <= 1950;
-  const maxVisualizer = 3000;
+  const placeBid = () => {
+    if (!isConnected || !isValidBid) return;
+    // Update bucket counts
+    const newCounts = [...bucketCounts];
+    newCounts[userBucket]++;
+    setBucketCounts(newCounts);
+    setHasPlacedBid(true);
+  };
 
   return (
     <div className="w-full max-w-4xl mx-auto flex flex-col gap-6 font-mono">
@@ -111,19 +119,31 @@ export const AuctionHash = () => {
             </div>
             <div className="text-center text-xs text-gray-500 mt-2">Sunday 20:00 UTC</div>
           </div>
+          
           <div className="border border-white/30 p-4 flex flex-col gap-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">AUCTION #</span>
               <span>47</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">PARTICIPANTS</span>
-              <span>23</span>
+              <span className="text-gray-500">SEALED BIDS</span>
+              <span>{totalBids}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">CONSENSUS</span>
-              <span className="text-green-500">1,550 HASH</span>
+              <span className="text-gray-500">MAX GAP RULE</span>
+              <span className="text-yellow-500">30%</span>
             </div>
+          </div>
+
+          {/* SEALED BID INFO */}
+          <div className="border border-yellow-500/30 bg-yellow-500/5 p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Lock size={14} className="text-yellow-500" />
+              <span className="text-xs font-bold text-yellow-500">SEALED BID AUCTION</span>
+            </div>
+            <p className="text-xs text-gray-400">
+              Exact bid amounts are hidden until Sunday 20:00 UTC. Only bucket distribution is visible via the heatmap.
+            </p>
           </div>
         </div>
 
@@ -143,6 +163,21 @@ export const AuctionHash = () => {
                   [ CONNECT WALLET ]
                 </button>
               </div>
+            ) : hasPlacedBid ? (
+              <div className="text-center py-6">
+                <div className="text-green-500 text-4xl mb-3">✓</div>
+                <div className="text-green-500 font-bold mb-2">BID PLACED</div>
+                <div className="text-gray-400 text-sm mb-4">
+                  Your sealed bid of <span className="text-white font-bold">{userBid.toLocaleString()} HASH</span> is locked.
+                </div>
+                <div className="border border-gray-700 p-3 text-xs text-gray-500">
+                  <div className="flex items-center justify-center gap-2">
+                    <Eye size={12} />
+                    Your bid is in bucket [{BUCKETS[userBucket].label}]
+                  </div>
+                  <div className="mt-1">Exact amount hidden until reveal</div>
+                </div>
+              </div>
             ) : (
               <>
                 <div className="mb-6">
@@ -152,95 +187,114 @@ export const AuctionHash = () => {
                       type="number"
                       value={userBid}
                       onChange={(e) => setUserBid(Number(e.target.value))}
-                      className={`w-full bg-black border p-4 text-xl font-bold outline-none transition-colors ${isSafe ? 'border-green-500 text-green-500' : 'border-yellow-500 text-yellow-500'}`}
+                      className={`w-full bg-black border p-4 text-xl font-bold outline-none transition-colors ${isValidBid ? 'border-white text-white' : 'border-red-500 text-red-500'}`}
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-500">HASH</span>
                   </div>
-                  <div className={`text-[10px] mt-2 flex items-center gap-2 ${isSafe ? 'text-green-500' : 'text-yellow-500'}`}>
-                    {isSafe ? <CheckCircle size={12}/> : <AlertTriangle size={12}/>}
-                    SAFE ZONE: 1,200 — 1,950 HASH
+                  
+                  {/* Bucket indicator */}
+                  <div className="mt-3 p-3 border border-gray-700 bg-gray-900/50">
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-gray-500">📊 Your bucket:</span>
+                      <span className={`font-bold ${userBucket === hotZoneBucket ? 'text-orange-400' : 'text-cyan-400'}`}>
+                        [{BUCKETS[userBucket].label}]
+                      </span>
+                      {userBucket === hotZoneBucket && (
+                        <span className="text-orange-400 text-[10px]">🔥 HOT ZONE</span>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-gray-500 mt-1 flex items-center gap-1">
+                      <Lock size={10} />
+                      Exact amount stays hidden until reveal
+                    </div>
                   </div>
+                  
+                  {!isValidBid && (
+                    <div className="text-[10px] mt-2 flex items-center gap-2 text-red-500">
+                      <AlertTriangle size={12}/>
+                      Minimum bid is 100 HASH
+                    </div>
+                  )}
                 </div>
                 <button
                   onClick={placeBid}
+                  disabled={!isValidBid}
                   className="w-full border-2 border-white py-4 font-bold text-lg hover:bg-white hover:text-black transition-all active:translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  [ PLACE BID ]
+                  [ PLACE SEALED BID ]
                 </button>
               </>
             )}
           </div>
 
-          {/* VISUALIZER */}
-          <div className="border border-white/30 p-4 bg-black h-32 relative flex items-end pb-6 overflow-hidden">
-            <div className="absolute top-2 left-2 text-[10px] text-gray-500">CONSENSUS VISUALIZER</div>
-            {/* Safe Zone Highlight */}
-            <div 
-              className="absolute top-8 bottom-6 bg-green-500/10 border-x border-green-500/30"
-              style={{ left: `${(1200/maxVisualizer)*100}%`, width: `${((1950-1200)/maxVisualizer)*100}%` }}
-            />
-            {/* Bids Dots */}
-            {bids.map((bid, i) => (
-              <div
-                key={i}
-                className={`absolute w-1.5 h-1.5 rounded-full bottom-8 ${
-                  bid.status === 'SAFE' ? 'bg-green-500' : 
-                  bid.status === 'DANGER' ? 'bg-red-500' : 'bg-gray-600'
-                }`}
-                style={{ left: `${(bid.amount / maxVisualizer) * 100}%` }}
-              />
-            ))}
-            {/* User Marker */}
-            <div 
-              className="absolute bottom-6 transition-all duration-300"
-              style={{ left: `${(userBid / maxVisualizer) * 100}%`, transform: 'translateX(-50%)' }}
-            >
-              <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[6px] border-b-cyan-500"></div>
+          {/* HEATMAP */}
+          <div className="border border-white/30 p-4 bg-black">
+            <div className="flex justify-between items-center mb-4">
+              <div className="text-xs text-gray-500">CONSENSUS HEATMAP</div>
+              <div className="text-xs text-gray-400">{totalBids} bidders</div>
             </div>
-            {/* Axis Line */}
-            <div className="absolute bottom-6 left-0 w-full h-px bg-gray-700"></div>
-            <div className="absolute bottom-2 left-0 text-[9px] text-gray-600">0</div>
-            <div className="absolute bottom-2 right-0 text-[9px] text-gray-600">{maxVisualizer}</div>
+            
+            <div className="space-y-2">
+              {BUCKETS.map((bucket, i) => {
+                const count = bucketCounts[i];
+                const percentage = totalBids > 0 ? (count / totalBids) * 100 : 0;
+                const isHotZone = i === hotZoneBucket && count > 0;
+                const isUserBucket = i === userBucket && hasPlacedBid;
+                
+                return (
+                  <div key={bucket.id} className="flex items-center gap-3">
+                    <div className="w-16 text-xs text-gray-500 text-right">[{bucket.label}]</div>
+                    <div className="flex-1 h-6 bg-gray-900 relative overflow-hidden border border-gray-800">
+                      <div 
+                        className={`h-full transition-all duration-500 ${
+                          isHotZone ? 'bg-gradient-to-r from-orange-600 to-orange-400' :
+                          count > 0 ? 'bg-gradient-to-r from-green-900 to-green-700' : ''
+                        }`}
+                        style={{ width: `${percentage}%` }}
+                      />
+                      {isUserBucket && (
+                        <div className="absolute inset-0 border-2 border-cyan-500 flex items-center justify-end pr-2">
+                          <span className="text-[9px] text-cyan-400">← YOU</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="w-12 text-xs text-right">
+                      {count > 0 ? (
+                        <span className={isHotZone ? 'text-orange-400' : 'text-gray-400'}>
+                          {percentage.toFixed(0)}%
+                        </span>
+                      ) : (
+                        <span className="text-gray-700">—</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            <div className="mt-4 pt-3 border-t border-gray-800 text-[10px] text-gray-500">
+              💡 Most competition in [{BUCKETS[hotZoneBucket].label}] range • Exact amounts hidden
+            </div>
           </div>
         </div>
       </div>
 
-      {/* LIVE BIDS TABLE */}
-      <div className="border border-white/30 bg-black">
-        <div className="flex justify-between p-3 border-b border-white/20 bg-white/5 items-center">
-          <span className="text-xs font-bold">LIVE FEED</span>
-          <button className="text-[10px] border border-gray-600 px-2 hover:bg-white hover:text-black">[FILTER ▼]</button>
+      {/* RULES SUMMARY */}
+      <div className="border border-white/20 p-4 bg-black/50 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="text-center">
+          <div className="text-2xl mb-1">🏆</div>
+          <div className="text-xs text-gray-500">WINNER</div>
+          <div className="text-sm">Highest valid bid</div>
         </div>
-        <div className="grid grid-cols-12 text-[10px] text-gray-500 p-2 uppercase border-b border-gray-800">
-          <div className="col-span-1">#</div>
-          <div className="col-span-4">BIDDER</div>
-          <div className="col-span-3">AMOUNT</div>
-          <div className="col-span-2">STATUS</div>
-          <div className="col-span-2 text-right">TIME</div>
+        <div className="text-center">
+          <div className="text-2xl mb-1">⚠️</div>
+          <div className="text-xs text-gray-500">CONSENSUS RULE</div>
+          <div className="text-sm">Max 30% gap to #2</div>
         </div>
-        <div className="max-h-60 overflow-y-auto">
-          {bids.map((bid, i) => (
-            <div 
-              key={bid.id} 
-              className={`grid grid-cols-12 text-xs p-3 border-b border-gray-800 items-center ${
-                bid.bidder.includes('YOU') ? 'bg-cyan-900/20 text-cyan-400' : 'text-gray-300'
-              }`}
-            >
-              <div className="col-span-1 text-gray-600">{i + 1}</div>
-              <div className="col-span-4 font-mono">{bid.bidder}</div>
-              <div className="col-span-3 font-bold">{bid.amount.toLocaleString()} HASH</div>
-              <div className="col-span-2">
-                <span className={`px-1.5 py-0.5 text-[9px] border ${
-                  bid.status === 'SAFE' ? 'border-green-500 text-green-500' :
-                  bid.status === 'DANGER' ? 'border-red-500 text-red-500' :
-                  'border-gray-500 text-gray-500'
-                }`}>
-                  {bid.status}
-                </span>
-              </div>
-              <div className="col-span-2 text-right text-gray-500">{bid.time}</div>
-            </div>
-          ))}
+        <div className="text-center">
+          <div className="text-2xl mb-1">💰</div>
+          <div className="text-xs text-gray-500">IF YOU LOSE</div>
+          <div className="text-sm">Get 90% back</div>
         </div>
       </div>
     </div>
