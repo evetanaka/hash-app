@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { CheckCircle, AlertTriangle, Lock, Eye } from 'lucide-react';
+import { AlertTriangle, Lock, Eye } from 'lucide-react';
 import { useAccount, useConnect } from 'wagmi';
 import { injected } from 'wagmi/connectors';
 
@@ -37,7 +37,7 @@ const getBucketForAmount = (amount: number): number => {
 };
 
 export const AuctionHash = () => {
-  const { address, isConnected } = useAccount();
+  const { isConnected } = useAccount();
   const { connect } = useConnect();
   
   const [jackpot, setJackpot] = useState(247832);
