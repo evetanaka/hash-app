@@ -10,7 +10,7 @@ export const CONTRACTS = {
   jackpotVault: '0xD0A14446a07928520158A3CE376Cf1Bef0B89eD1' as `0x${string}`,
   hashGame: '0xdEC5E4095b57219c1dCb9dD44083D769b4c0B690' as `0x${string}`,
   cyberSlots: '0x79D8C6942424c55342b71bEba304eE88E24e64D6' as `0x${string}`,  // V5 - 3x3 Grid + Lock & Respin
-  auctionHash: '0x0000000000000000000000000000000000000000' as `0x${string}`, // TODO: Deploy and update
+  auctionHash: '0x9538861e27fe24dd9aec20d393701a77d3cce45c' as `0x${string}`, // Deployed 2026-02-04
   // Legacy (deprecated)
   hashJackpot: '0x4760Ad151103428c4bBfdc710EDc859e85703899' as `0x${string}`,
 }
