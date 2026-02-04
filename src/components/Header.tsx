@@ -8,6 +8,7 @@ import { formatEther } from 'viem'
 const NAV_ITEMS = [
   { path: '/', label: 'GAMES' },
   { path: '/play', label: 'PLAY' },
+  { path: '/auction', label: 'AUCTION' },
   { path: '/stake', label: 'STAKE' },
   { path: '/history', label: 'HISTORY' },
   { path: '/ref', label: 'REF' },
