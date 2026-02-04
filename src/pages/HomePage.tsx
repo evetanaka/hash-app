@@ -128,16 +128,15 @@ export function HomePage() {
     {
       id: 'AUCTION',
       path: '/auction',
-      name: 'AUCTION_BLIND',
+      name: 'AUCTION_HASH',
       icon: <Gift size={28} />,
-      desc: 'SECRET BIDDING. WINNER TAKES ALL.',
-      disabled: true,
-      accent: 'text-red-400',
-      border: 'border-white/10',
+      desc: 'CONSENSUS BIDDING. WHALES BEWARE.',
+      accent: 'text-yellow-400',
+      border: 'group-hover:border-yellow-400/50',
       stats: [
         { label: 'TOP BID', val: liveData.auctionBid.toLocaleString(), icon: DollarSign },
-        { label: 'ITEMS', val: '3 RARE', icon: Trophy },
-        { label: 'ENDS', val: '02:14:00', icon: Activity }
+        { label: 'BIDDERS', val: '24', icon: Users },
+        { label: 'ENDS', val: '5d 14h', icon: Activity }
       ]
     },
   ]
