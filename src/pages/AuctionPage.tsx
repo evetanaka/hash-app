@@ -4,6 +4,7 @@ import { parseEther, formatEther } from 'viem'
 import { useAuctionHash, formatCountdown, formatAmount } from '../hooks/useAuctionHash'
 import { useHashToken } from '../hooks/useHashToken'
 import { GetHashCTA } from '../components/GetHashCTA'
+import { AuctionHash as AuctionHashDemo } from './AuctionHash'
 
 // Format address for display
 function formatAddress(addr: string): string {
@@ -125,17 +126,9 @@ export function AuctionPage() {
     approve(parseEther('1000000000')) // Large approval
   }
 
-  // Contract not deployed check
+  // Contract not deployed - show demo UI
   if (contractAddress === '0x0000000000000000000000000000000000000000') {
-    return (
-      <main className="flex flex-col items-center justify-center py-20">
-        <div className="text-6xl mb-4">🔨</div>
-        <h1 className="text-2xl font-bold mb-2">COMING SOON</h1>
-        <p className="text-gray-500 text-center max-w-md">
-          Auction Hash is currently in development. Check back soon for the ultimate consensus-based auction game!
-        </p>
-      </main>
-    )
+    return <AuctionHashDemo />
   }
 
   return (
